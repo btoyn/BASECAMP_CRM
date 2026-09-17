@@ -202,7 +202,7 @@ export async function importLenders(
     },
   });
 
-  revalidatePath("/lenders");
+  revalidatePath("/spheres", "layout");
   revalidatePath("/institutions");
   revalidatePath("/dashboard");
   return report;

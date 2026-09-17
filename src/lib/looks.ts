@@ -41,6 +41,70 @@ export function isLookOpen(stage: string): boolean {
   return !CLOSED_STAGES.has(stage);
 }
 
+/**
+ * The Pipeline board's columns.
+ *
+ * Narrower than `stage` on purpose. `stage` still decides whether the follow-up
+ * clock runs; this says which column the card is in, and it is set by moving
+ * the card rather than inferred. "Followed up" in particular has to be a place
+ * he puts something — an attempt counter also ticks for a voicemail nobody
+ * returned, which is not the same as having dealt with it.
+ */
+export type LookStatus = "new" | "followed_up" | "became_loan" | "went_nowhere";
+
+export interface PipelineColumn {
+  status: LookStatus;
+  label: string;
+  description: string;
+}
+
+/** Left to right, the way a look actually travels. */
+export const PIPELINE_COLUMNS: PipelineColumn[] = [
+  { status: "new", label: "New look", description: "Raised, not yet chased" },
+  { status: "followed_up", label: "Followed up", description: "You've been back to them" },
+  { status: "became_loan", label: "Became a loan", description: "Turned into real business" },
+];
+
+/**
+ * Looks that went nowhere stay off the board.
+ *
+ * They are the majority over time and a fourth column of them would bury the
+ * three that matter. The records are kept and listed under the board, because
+ * "what happened to that Cedar City building" still needs an answer.
+ */
+export const OFF_BOARD_STATUS: LookStatus = "went_nowhere";
+
+export function isPipelineColumn(status: string): status is LookStatus {
+  return PIPELINE_COLUMNS.some((c) => c.status === status);
+}
+
+export function isLookStatus(value: string): value is LookStatus {
+  return isPipelineColumn(value) || value === OFF_BOARD_STATUS;
+}
+
+export function readLookStatus(value: string | null | undefined): LookStatus {
+  return value && isLookStatus(value) ? value : "new";
+}
+
+/**
+ * Where a look belongs when only the old `stage` is known.
+ *
+ * The migration backfilled every existing row with this, and it stays here so
+ * anything written by an older code path still lands in the right column.
+ */
+export function lookStatusFromStage(stage: string, attempts: number): LookStatus {
+  if (stage === LOOK_STAGE.becameLoan) return "became_loan";
+  if (!isLookOpen(stage)) return "went_nowhere";
+  return attempts > 0 ? "followed_up" : "new";
+}
+
+/** The `stage` a status implies, so the follow-up clock follows the board. */
+export function stageForStatus(status: LookStatus): string {
+  if (status === "became_loan") return LOOK_STAGE.becameLoan;
+  if (status === "went_nowhere") return LOOK_STAGE.wentNowhere;
+  return LOOK_STAGE.open;
+}
+
 const DAY_MS = 86_400_000;
 
 /** Whole days from `from` to `to`, ignoring the time of day. */

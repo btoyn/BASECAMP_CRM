@@ -238,10 +238,6 @@ export default async function DashboardPage() {
       icon: "promise" as const,
       label: plural(promises.length, "overdue promise"),
     },
-    dueLoans.length > 0 && {
-      icon: "loan" as const,
-      label: `${plural(dueLoans.length, "loan update")} due`,
-    },
     relationshipRows.length > 0 && {
       icon: "list" as const,
       label: `${relationshipRows.length} on this week's list`,
@@ -280,9 +276,6 @@ export default async function DashboardPage() {
         firstName={profile?.display_name?.split(" ")[0] ?? null}
         summary={summary}
         chips={chips}
-        coveragePct={coveragePct}
-        coveredCount={personalCovered}
-        activeCount={active.length}
         hasPlan={Boolean(plan)}
         aiEnabled={getFlags().ai}
       />
