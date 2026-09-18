@@ -93,32 +93,52 @@ system.
 
 ## 5. Tiers — the actual definitions
 
-Four tiers, in his words:
+Four tiers, in his words, and now applied to all 137 lenders:
 
-| Tier | Definition | Cadence |
-|---|---|---|
-| **A** | Has sent me looks or deals | **Monthly** |
-| **B** | Hasn't yet, but has real potential | Every 6 weeks |
-| **C** | No deals, good relationship, 2.5 years of marketing and nothing | Quarterly |
-| **D** | No deals, not a great relationship — stay on the radar so they know I exist | Twice a year |
+| Tier | Definition | Cadence | Count |
+|---|---|---|---|
+| **A** | Has sent me looks or deals | Monthly | 33 |
+| **B** | Hasn't yet, but has real potential | Monthly | 41 |
+| **C** | Good relationship, 2.5 years of marketing and nothing | Quarterly | 45 |
+| **D** | No deals, not a great relationship — stay on the radar | Twice a year | 17 |
+| — | Untiered | Workspace default | 1 |
 
-Two weeks was rejected as overkill. **Monthly is the ceiling**, even for the
-best relationships. B / C / D cadences above are proposed, not yet confirmed.
+Two weeks was rejected as overkill. **Monthly is the ceiling**, and A and B
+share it: the difference between them is the bar for what counts, not how
+often.
 
-Today's A list is **14 people** — everyone who has ever sent a look or a loan.
-That is a real, finite, monthly-touchable list, and it grows by itself as
-people produce. B is judgement and has to be marked by hand.
+### A does not mean "has a row in this database"
 
-Changes this forces in code:
-- `Tier` gains `"D"`; the DB check constraint and `TIER_GOAL_DAYS` follow.
-- `TIER_GOAL_DAYS` becomes `{ A: 30, B: 45, C: 90, D: 180, unassigned: null }`.
-- Tier A can be **auto-suggested** from the referral count — that part needs no
-  human input at all.
-- The new-lender form needs a tier field. Untiered is fine as a state, but
-  every lender added later must be rankable at the moment he adds them, not
-  only in a spreadsheet later.
+Only 14 of the 33 A's show a deal in Basecamp. That is not a contradiction —
+the deal history predates the tool, and some are in flight right now. The
+consequence is a rule:
 
----
+> **Basecamp never sets or changes a tier on its own.** Not from deal count,
+> not from how long it has been. The tier is his judgement, and the app's job
+> is to remember it.
+
+An earlier draft of this document had the app auto-promoting producers to A.
+That would have been wrong in both directions: it would have demoted 19 people
+whose deals it simply has not been told about.
+
+### What counts as a touch
+
+| Tier | Bar |
+|---|---|
+| A, B | A real exchange — a call, a meeting, a text, or **a reply from them**. An email he sent into silence does not count. |
+| C, D | Any contact. The point at this level is that they heard from him. |
+| Anyone | A campaign blast never counts, at any tier. |
+
+The failure this prevents: a stack of unanswered emails showing as a fully
+covered A list, going green at exactly the moment the relationships went
+quiet. The rule is `countsAsTouch` in `lib/tiers.ts`, and the coverage view
+carries a matching `last_conversation_at` column. **Eleven lenders today have
+outbound email and nothing else** — under the old rule they read as touched.
+
+### Workload
+
+A and B monthly, measured on conversations, is ~74 people a month. Most are
+texts and calls, not lunches.
 
 ## 6. Groups
 
@@ -223,15 +243,16 @@ Named as a go-live condition:
   week makes the credit work; the links themselves still need doing).
 - Duplicates resolved.
 - 12 lenders have no email address and can't be scheduled with at all.
-- 142 lenders tiered via the spreadsheet — which needs **bank and title** next
-  to each name to be markable.
+- ~~142 lenders tiered via the spreadsheet~~ — **done**, 18 Sep. 137 tiered,
+  5 portfolio-manager and treasury contacts removed (seen in passing, never
+  someone to call), 3 bank moves followed the person rather than deleting them.
+  Ryan Stevenson is the one still untiered.
 
 ---
 
 ## 11. Sequence
 
-1. Tier the 142 (spreadsheet, with bank + title). Auto-mark the 14 A's first so
-   he's only judging the rest.
+1. ~~Tier the 142.~~ Done.
 2. Clean the data.
 3. Microsoft registration → calendar reading + drafts + reply reading.
 4. Rename the nav, cut the dead screens and the twenty empty tables.

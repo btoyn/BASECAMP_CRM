@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { lenderCoverage, type LenderCoverageResult } from "@/lib/coverage";
-import { readTier, tierGoalDays } from "@/lib/tiers";
+import { qualifyingTouchAt, readTier, tierGoalDays } from "@/lib/tiers";
 import type { SphereRow } from "@/lib/spheres";
 import type { CoverageRow, Lender, UserPreferences } from "@/lib/types";
 
@@ -51,7 +51,10 @@ export async function getLendersWithCoverage(): Promise<LenderWithCoverage[]> {
         coverage: lenderCoverage(
           {
             lastVisibleTouchAt: c?.last_visible_touch_at ?? null,
-            lastPersonalTouchAt: c?.last_personal_touch_at ?? null,
+            lastPersonalTouchAt: qualifyingTouchAt(l.relationship_tier, {
+              personal: c?.last_personal_touch_at ?? null,
+              conversation: c?.last_conversation_at ?? null,
+            }),
             hasConfirmedFutureMeeting: c?.has_confirmed_future_meeting ?? false,
           },
           { goalDays: tierGoalDays(l.relationship_tier, workspaceGoal), graceDays },
@@ -186,7 +189,10 @@ export async function getNavCounts(): Promise<NavCounts> {
       lenderCoverage(
         {
           lastVisibleTouchAt: c?.last_visible_touch_at ?? null,
-          lastPersonalTouchAt: c?.last_personal_touch_at ?? null,
+          lastPersonalTouchAt: qualifyingTouchAt(l.relationship_tier, {
+            personal: c?.last_personal_touch_at ?? null,
+            conversation: c?.last_conversation_at ?? null,
+          }),
           hasConfirmedFutureMeeting: c?.has_confirmed_future_meeting ?? false,
         },
         { goalDays: tierGoalDays(l.relationship_tier, workspaceGoal), graceDays },
