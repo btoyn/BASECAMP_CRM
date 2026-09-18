@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 import { MEETING_TYPE_DURATIONS, MEETING_TYPE_LABELS } from "@/lib/labels";
-import { loadSchedulingWindow } from "@/lib/scheduling-window";
+import { loadSchedulingWindow, type CalendarSource } from "@/lib/scheduling-window";
+import { addConfirmedMeetingToCalendar } from "@/lib/microsoft/calendar-sync";
 import { formatNameList, type SlotVerdict } from "@/lib/group-proposal";
 import type { AvailabilityRule } from "@/lib/scheduling";
 
@@ -47,6 +48,8 @@ export interface GroupProposalContext {
   horizonDays: number;
   slotCount: number;
   busy: { start: string; end: string }[];
+  /** Whether those blocks include his real Outlook calendar. */
+  calendar: CalendarSource;
 }
 
 export async function getGroupProposalContext(
@@ -97,6 +100,7 @@ export async function getGroupProposalContext(
       horizonDays: window.horizonDays,
       slotCount: window.slotCount,
       busy: window.busy,
+      calendar: window.calendar,
     },
   };
 }
@@ -305,7 +309,7 @@ export async function confirmGroupMeeting(
   // Only people who were actually invited to this proposal can be on it.
   const { data: invited } = await supabase
     .from("meeting_proposal_attendees")
-    .select("lender_id, lender:lenders(first_name, territory)")
+    .select("lender_id, lender:lenders(first_name, territory, email)")
     .eq("proposal_id", input.proposalId)
     .in("lender_id", input.lenderIds);
 
@@ -320,7 +324,12 @@ export async function confirmGroupMeeting(
     .maybeSingle();
 
   const people = (invited ?? []).map(
-    (a) => a.lender as unknown as { first_name: string; territory: string | null } | null,
+    (a) =>
+      a.lender as unknown as {
+        first_name: string;
+        territory: string | null;
+        email: string | null;
+      } | null,
   );
   const firstNames = people.map((p) => p?.first_name).filter((n): n is string => Boolean(n));
   const label =
@@ -369,6 +378,18 @@ export async function confirmGroupMeeting(
     })),
   );
   if (attendeeError) return { error: attendeeError.message };
+
+  // One invitation with everyone on it, the same way the ask went out.
+  await addConfirmedMeetingToCalendar({
+    meetingId: meeting.id,
+    subject: `${label.charAt(0).toUpperCase()}${label.slice(1)} with ${withWhom}`,
+    start,
+    minutes,
+    locationName: proposal.location_name,
+    attendeeEmails: people
+      .map((p) => p?.email)
+      .filter((e): e is string => Boolean(e)),
+  });
 
   await supabase
     .from("meeting_proposals")

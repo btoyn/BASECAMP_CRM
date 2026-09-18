@@ -384,8 +384,12 @@ export function GroupProposalSheet({
                       ))}
                     </div>
                     <p className="mt-1.5 text-[12px] text-muted">
-                      Everyone gets both dates and answers for themselves. It can&apos;t see your
-                      Outlook calendar yet — check these before you send.
+                      Everyone gets both dates and answers for themselves.{" "}
+                      {context.calendar === "outlook"
+                        ? "Checked against your Outlook calendar."
+                        : context.calendar === "outlook_unavailable"
+                          ? "Outlook didn't answer just now — check these before you send."
+                          : "It can't see your Outlook calendar yet — check these before you send."}
                     </p>
                   </div>
                 )}

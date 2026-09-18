@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { MEETING_TYPE_DURATIONS } from "@/lib/labels";
 import { logAudit } from "@/lib/audit";
-import { loadSchedulingWindow } from "@/lib/scheduling-window";
+import { loadSchedulingWindow, type CalendarSource } from "@/lib/scheduling-window";
+import { addConfirmedMeetingToCalendar } from "@/lib/microsoft/calendar-sync";
 import type { AvailabilityRule } from "@/lib/scheduling";
 
 /**
@@ -32,6 +33,8 @@ export interface ProposalContext {
   slotCount: number;
   /** Meetings and dates already promised elsewhere, as ISO strings. */
   busy: { start: string; end: string }[];
+  /** Whether those blocks include his real Outlook calendar. */
+  calendar: CalendarSource;
   daysSinceContact: number | null;
 }
 
@@ -86,6 +89,7 @@ export async function getProposalContext(
       horizonDays: window.horizonDays,
       slotCount: window.slotCount,
       busy: window.busy,
+      calendar: window.calendar,
       daysSinceContact,
     },
   };
@@ -243,7 +247,7 @@ export async function bookProposal(
 
   const { data: lender } = await supabase
     .from("lenders")
-    .select("full_name, institution_id, territory")
+    .select("full_name, institution_id, territory, email")
     .eq("id", proposal.lender_id)
     .maybeSingle();
   if (!lender) return { error: "Lender not found." };
@@ -282,6 +286,17 @@ export async function bookProposal(
     response_status: "confirmed",
   });
   if (attendeeError) return { error: attendeeError.message };
+
+  // Best effort: the meeting is booked in Basecamp either way. A calendar that
+  // won't answer must not undo a confirmation he already pressed.
+  await addConfirmedMeetingToCalendar({
+    meetingId: meeting.id,
+    subject: `${label} with ${lender.full_name}`,
+    start,
+    minutes,
+    locationName: proposal.location_name,
+    attendeeEmails: lender.email ? [lender.email] : [],
+  });
 
   await supabase
     .from("meeting_proposals")

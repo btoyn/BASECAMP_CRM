@@ -55,10 +55,66 @@ a phone. To swap the picture later, replace that file; no code changes needed.
 
 ## 4. Later phases (don't need decisions now)
 
-- **Microsoft 365**: register an Entra app (Graph: Calendars.ReadWrite,
-  Mail.ReadWrite for drafts), set `MICROSOFT_CLIENT_ID` etc. The Settings
-  screen already shows connection status; adapters are stubbed.
 - **Resend domain verification** for nicer from-addresses.
 - **Daily digest cron**: a Vercel cron hitting an API route at 8:00 AM
   America/Denver (14:00 UTC in daylight time, Mon–Fri) — route to be added with the
   digest feature.
+
+
+## 5. Connecting Microsoft 365
+
+The code is written and waiting. What it needs is an app registration and, on a
+work account, an administrator's approval. Until that exists the app behaves
+exactly as it did before: dates are suggested from your availability windows and
+the meetings Basecamp already knows about, and the ask opens in your mail client
+through a `mailto:` link.
+
+### Register the app
+
+1. **Microsoft Entra admin center** → *App registrations* → *New registration*.
+   - Name it something recognisable — it is what the consent screen shows.
+   - Supported account types: **accounts in this organizational directory only**.
+   - Redirect URI: **Web**, set to `https://<your-domain>/api/microsoft/callback`.
+     It must match exactly, including the scheme. Add a second one for
+     `http://localhost:3000/api/microsoft/callback` if you want to test locally.
+2. **Certificates & secrets** → *New client secret*. Copy the **value**
+   immediately; it is never shown again.
+3. **API permissions** → *Add a permission* → *Microsoft Graph* → **Delegated**:
+
+   | Permission | What it buys |
+   |---|---|
+   | `offline_access` | It keeps working tomorrow without signing in again |
+   | `User.Read` | Which account is connected |
+   | `Calendars.ReadWrite` | Real free/busy, and the invite on Confirm |
+   | `Mail.ReadWrite` | Leaving the ask as a draft in Outlook |
+   | `Mail.Send` | Sending it directly (nothing calls this yet) |
+
+4. **Grant admin consent** for the organisation. On a work tenant this is the
+   step that actually gates everything, and it may need IT rather than you.
+
+### Set the environment variables
+
+On Vercel (Project → Settings → Environment Variables):
+
+| Variable | Where it comes from |
+|---|---|
+| `MICROSOFT_CLIENT_ID` | The registration's *Application (client) ID* |
+| `MICROSOFT_CLIENT_SECRET` | The secret **value** from step 2 |
+| `MICROSOFT_TENANT_ID` | The *Directory (tenant) ID*. Optional; defaults to `organizations` |
+| `MICROSOFT_TOKEN_ENCRYPTION_KEY` | A long random string you generate — e.g. `openssl rand -base64 48` |
+
+`MICROSOFT_TOKEN_ENCRYPTION_KEY` encrypts the refresh tokens before they are
+written to the database. It is not optional: without it the connection refuses
+to start rather than store standing mailbox access in the clear. **Changing it
+later makes existing connections unreadable** — everyone simply reconnects, but
+don't rotate it casually.
+
+### Connect
+
+Redeploy, then **Settings → Microsoft 365 → Connect**. You pick the account,
+Microsoft asks for consent, and you land back on Settings. The card then lists
+which capabilities were actually granted — a partial grant is normal, and each
+line says what still works without it.
+
+Disconnecting from that card makes Basecamp forget the tokens. It does not
+revoke the app at Microsoft; that is done in your own account's *My Apps*.

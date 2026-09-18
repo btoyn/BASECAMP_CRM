@@ -352,8 +352,11 @@ function Sheet({
                       ))}
                     </div>
                     <p className="mt-1.5 text-[12px] text-muted">
-                      Worked out from your availability and what&apos;s already booked. It
-                      can&apos;t see your Outlook calendar yet — check these before you send.
+                      {context.calendar === "outlook"
+                        ? "Worked out from your availability, what's already booked, and your Outlook calendar."
+                        : context.calendar === "outlook_unavailable"
+                          ? "Outlook didn't answer just now, so these avoid only what the app already knows about — check them before you send."
+                          : "Worked out from your availability and what's already booked. It can't see your Outlook calendar yet — check these before you send."}
                     </p>
                   </div>
                 )}

@@ -1,6 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MEETING_TYPE_DURATIONS } from "./labels";
+import { getFreeBusy } from "./microsoft/graph";
+import { getConnection } from "./microsoft/tokens";
 import type { AvailabilityRule } from "./scheduling";
 
 /**
@@ -15,12 +17,21 @@ import type { AvailabilityRule } from "./scheduling";
 
 const MINUTE = 60_000;
 
+/**
+ * Where the busy list came from, so a screen can say how much to trust it.
+ *
+ * `crm` is the old behaviour and still the fallback: it only knows the
+ * meetings this app recorded, which is most of a working week short.
+ */
+export type CalendarSource = "crm" | "outlook" | "outlook_unavailable";
+
 export interface SchedulingWindow {
   rules: AvailabilityRule[];
   horizonDays: number;
   slotCount: number;
   /** Absolute instants, ready to cross to the browser. */
   busy: { start: string; end: string }[];
+  calendar: CalendarSource;
 }
 
 export async function loadSchedulingWindow(
@@ -71,6 +82,17 @@ export async function loadSchedulingWindow(
     }
   }
 
+  const horizonDays = prefs?.propose_horizon_days ?? 14;
+
+  /* The real calendar, when it is connected.
+   *
+   * Merged in rather than replacing the CRM's own blocks: a date already
+   * offered to another lender is not on anyone's Outlook calendar yet, and
+   * offering the same Thursday twice is the collision this list exists to
+   * prevent. If Graph can't answer, the source says so and the screen warns —
+   * an empty answer must never read as a free week. */
+  const calendar = await mergeOutlookBusy(busy, now, horizonDays);
+
   return {
     rules: (rules ?? []).map((r) => ({
       meetingType: r.meeting_type,
@@ -78,8 +100,29 @@ export async function loadSchedulingWindow(
       startMinute: r.start_minute,
       endMinute: r.end_minute,
     })),
-    horizonDays: prefs?.propose_horizon_days ?? 14,
+    horizonDays,
     slotCount: prefs?.proposal_slot_count ?? 2,
     busy,
+    calendar,
   };
+}
+
+/** Appends Outlook's busy blocks to `busy` in place, and says what happened. */
+async function mergeOutlookBusy(
+  busy: { start: string; end: string }[],
+  now: Date,
+  horizonDays: number,
+): Promise<CalendarSource> {
+  const connection = await getConnection();
+  if (!connection || connection.invalidatedAt || !connection.accountEmail) return "crm";
+
+  const result = await getFreeBusy({
+    email: connection.accountEmail,
+    start: now,
+    end: new Date(now.getTime() + horizonDays * 24 * 60 * MINUTE),
+  });
+
+  if (!result.ok) return "outlook_unavailable";
+  busy.push(...result.busy);
+  return "outlook";
 }
