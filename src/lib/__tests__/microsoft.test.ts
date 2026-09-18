@@ -8,7 +8,12 @@ import {
   type GraphScheduleEntry,
 } from "../microsoft/free-busy";
 import { expiryFromSeconds, isConsentLost, needsRefresh } from "../microsoft/expiry";
-import { authorizeUrl, redirectUriFor, type MicrosoftConfig } from "../microsoft/config";
+import {
+  authorizeUrl,
+  redirectUriFor,
+  scopeSatisfied,
+  type MicrosoftConfig,
+} from "../microsoft/config";
 
 const SECRET = "a-long-random-value-from-the-environment";
 
@@ -268,5 +273,32 @@ describe("authorizeUrl", () => {
     expect(url.searchParams.get("scope")).toContain("Calendars.ReadWrite");
     // A work laptop is usually signed into two accounts.
     expect(url.searchParams.get("prompt")).toBe("select_account");
+  });
+});
+
+describe("scopeSatisfied", () => {
+  it("accepts the exact scope, whatever the casing Graph returns", () => {
+    expect(scopeSatisfied(["Calendars.ReadWrite"], "Calendars.ReadWrite")).toBe(true);
+    expect(scopeSatisfied(["calendars.readwrite"], "Calendars.ReadWrite")).toBe(true);
+  });
+
+  it("lets ReadWrite stand in for Read", () => {
+    // The bug this exists to stop: free/busy asks for Calendars.Read, the app
+    // only ever requests Calendars.ReadWrite, and an exact match would tell
+    // someone who granted everything that they had granted nothing.
+    expect(scopeSatisfied(["Calendars.ReadWrite"], "Calendars.Read")).toBe(true);
+    expect(scopeSatisfied(["Mail.ReadWrite"], "Mail.Read")).toBe(true);
+  });
+
+  it("does not let Read stand in for ReadWrite", () => {
+    expect(scopeSatisfied(["Calendars.Read"], "Calendars.ReadWrite")).toBe(false);
+  });
+
+  it("keeps unrelated scopes apart", () => {
+    // Mail.Send is not implied by anything — a tenant can grant drafting and
+    // withhold sending, and that has to keep showing as withheld.
+    expect(scopeSatisfied(["Mail.ReadWrite"], "Mail.Send")).toBe(false);
+    expect(scopeSatisfied(["Calendars.ReadWrite"], "Mail.Read")).toBe(false);
+    expect(scopeSatisfied([], "Calendars.Read")).toBe(false);
   });
 });

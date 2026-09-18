@@ -26,6 +26,28 @@ export const SCOPE_FOR = {
   draftMail: "Mail.ReadWrite",
 } as const;
 
+/**
+ * Whether a granted scope covers what a call needs.
+ *
+ * Graph returns the scopes it actually granted, and an exact string match gets
+ * this wrong in the ordinary case: reading free/busy needs `Calendars.Read`,
+ * this app only ever asks for `Calendars.ReadWrite`, and a straight comparison
+ * would report a missing permission to someone who had granted everything.
+ * ReadWrite is a superset of Read, so it satisfies it.
+ */
+const IMPLIED_BY: Record<string, readonly string[]> = {
+  "calendars.read": ["calendars.readwrite"],
+  "mail.read": ["mail.readwrite"],
+  "contacts.read": ["contacts.readwrite"],
+};
+
+export function scopeSatisfied(granted: readonly string[], required: string): boolean {
+  const want = required.toLowerCase();
+  const have = granted.map((s) => s.toLowerCase());
+  if (have.includes(want)) return true;
+  return (IMPLIED_BY[want] ?? []).some((wider) => have.includes(wider));
+}
+
 export interface MicrosoftConfig {
   clientId: string;
   clientSecret: string;

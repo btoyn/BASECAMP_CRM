@@ -63,58 +63,145 @@ a phone. To swap the picture later, replace that file; no code changes needed.
 
 ## 5. Connecting Microsoft 365
 
-The code is written and waiting. What it needs is an app registration and, on a
-work account, an administrator's approval. Until that exists the app behaves
-exactly as it did before: dates are suggested from your availability windows and
-the meetings Basecamp already knows about, and the ask opens in your mail client
-through a `mailto:` link.
+Everything here is one-time setup. Until it is done, Basecamp behaves exactly as
+it did before: dates come from your availability windows and the meetings it
+already knows about, and the ask opens in your mail client through a `mailto:`
+link. Nothing breaks while this is undone.
 
-### Register the app
+Budget twenty minutes. You will end up with four values to paste into Vercel.
 
-1. **Microsoft Entra admin center** → *App registrations* → *New registration*.
-   - Name it something recognisable — it is what the consent screen shows.
-   - Supported account types: **accounts in this organizational directory only**.
-   - Redirect URI: **Web**, set to `https://<your-domain>/api/microsoft/callback`.
-     It must match exactly, including the scheme. Add a second one for
-     `http://localhost:3000/api/microsoft/callback` if you want to test locally.
-2. **Certificates & secrets** → *New client secret*. Copy the **value**
-   immediately; it is never shown again.
-3. **API permissions** → *Add a permission* → *Microsoft Graph* → **Delegated**:
+### What you are actually asking Microsoft for
 
-   | Permission | What it buys |
-   |---|---|
-   | `offline_access` | It keeps working tomorrow without signing in again |
-   | `User.Read` | Which account is connected |
-   | `Calendars.ReadWrite` | Real free/busy, and the invite on Confirm |
-   | `Mail.ReadWrite` | Leaving the ask as a draft in Outlook |
-   | `Mail.Send` | Sending it directly (nothing calls this yet) |
+An **app registration** is a record in your organisation's directory saying
+"an application called Basecamp exists, and may ask people here for
+permission". On its own it grants nothing.
 
-4. **Grant admin consent** for the organisation. On a work tenant this is the
-   step that actually gates everything, and it may need IT rather than you.
+Basecamp then asks **you, personally**, for these. They are *delegated*
+permissions, which means Basecamp acts as you, with your own access, and can
+never reach anything you could not reach yourself:
 
-### Set the environment variables
+| Permission | What it buys | What it does not do |
+|---|---|---|
+| `offline_access` | Stays connected past the first hour | — |
+| `User.Read` | Shows which account is connected | Read anyone else's profile |
+| `Calendars.ReadWrite` | Real free/busy; the invite when you press Confirm | Touch another person's calendar |
+| `Mail.ReadWrite` | Reads replies to its own asks; leaves drafts in Outlook | Send anything |
+| `Mail.Send` | Sending directly, if you ever switch it on | Nothing calls this today |
 
-On Vercel (Project → Settings → Environment Variables):
+You can revoke the whole thing at any time from
+<https://myapps.microsoft.com> → the Basecamp tile → *Manage* → *Revoke*.
 
-| Variable | Where it comes from |
+### Do you need IT?
+
+Probably not. A Microsoft 365 tenant by default lets any user register an
+application, and lets any user consent to these permissions for their own
+mailbox. If `im504.com` is on those defaults, you can do all of this yourself.
+
+You will find out at the last step. If Entra says an administrator must
+approve, forward them §5 of this file; the approval is one click and applies
+to your account only.
+
+### Step 1 — Register the app
+
+Go to <https://entra.microsoft.com> and sign in with your work account.
+
+1. Left sidebar → **Identity** → **Applications** → **App registrations**.
+   *(If your tenant sends you to the old Azure portal instead, it is
+   <https://portal.azure.com> → search "App registrations". Same screens.)*
+2. **+ New registration**.
+3. Fill in:
+   - **Name**: `Basecamp` — this is the name you will see on the consent
+     screen, so make it one you will recognise.
+   - **Supported account types**: *Accounts in this organizational directory
+     only (im504 only - Single tenant)*.
+   - **Redirect URI**: change the dropdown from the default to **Web**, and
+     paste:
+
+     ```
+     https://fable-tracker.vercel.app/api/microsoft/callback
+     ```
+
+     This must match character for character, including `https://` and with no
+     trailing slash. A mismatch is the single most common failure, and
+     Microsoft's error message names the URI it expected — if you see that,
+     copy what it expected.
+4. **Register**.
+
+You land on the Overview page. Copy two values from it now:
+
+- **Application (client) ID** → this becomes `MICROSOFT_CLIENT_ID`
+- **Directory (tenant) ID** → this becomes `MICROSOFT_TENANT_ID`
+
+### Step 2 — Create a client secret
+
+1. Left menu → **Certificates & secrets** → **Client secrets** tab →
+   **+ New client secret**.
+2. Description: `Basecamp on Vercel`. Expiry: 24 months is the usual maximum.
+3. **Add**.
+4. **Copy the `Value` column immediately.** Not `Secret ID` — the one next to
+   it. It is shown once and never again; if you navigate away you delete it
+   and make another. This becomes `MICROSOFT_CLIENT_SECRET`.
+
+Put a reminder in your calendar for a month before it expires. When a secret
+expires the connection stops with a "reconnect" message, and the fix is a new
+secret rather than anything you did wrong.
+
+### Step 3 — Add the permissions
+
+1. Left menu → **API permissions**.
+2. **+ Add a permission** → **Microsoft Graph** → **Delegated permissions**.
+3. Search for and tick each of these, then **Add permissions**:
+   - `offline_access`
+   - `User.Read` *(usually already there from step 1)*
+   - `Calendars.ReadWrite`
+   - `Mail.ReadWrite`
+   - `Mail.Send`
+4. If you see a **Grant admin consent for im504** button and you are an
+   administrator, press it. It is not required — you can consent for yourself
+   at the end — but it removes the prompt.
+
+### Step 4 — Put the four values into Vercel
+
+<https://vercel.com/imbl/fable-tracker> → **Settings** → **Environment
+Variables**. Add each for **Production** (and Preview, if you want the preview
+deployments to work too — they need their own redirect URI added in step 1).
+
+| Variable | Value |
 |---|---|
-| `MICROSOFT_CLIENT_ID` | The registration's *Application (client) ID* |
-| `MICROSOFT_CLIENT_SECRET` | The secret **value** from step 2 |
-| `MICROSOFT_TENANT_ID` | The *Directory (tenant) ID*. Optional; defaults to `organizations` |
-| `MICROSOFT_TOKEN_ENCRYPTION_KEY` | A long random string you generate — e.g. `openssl rand -base64 48` |
+| `MICROSOFT_CLIENT_ID` | Application (client) ID from step 1 |
+| `MICROSOFT_CLIENT_SECRET` | The secret **Value** from step 2 |
+| `MICROSOFT_TENANT_ID` | Directory (tenant) ID from step 1 |
+| `MICROSOFT_TOKEN_ENCRYPTION_KEY` | A long random string — `openssl rand -base64 48` |
 
 `MICROSOFT_TOKEN_ENCRYPTION_KEY` encrypts the refresh tokens before they are
-written to the database. It is not optional: without it the connection refuses
-to start rather than store standing mailbox access in the clear. **Changing it
-later makes existing connections unreadable** — everyone simply reconnects, but
-don't rotate it casually.
+written to the database. It is not optional: without it, Basecamp refuses to
+start the connection rather than store standing mailbox access in the clear.
+**Changing it later makes every existing connection unreadable** — the fix is
+to reconnect, but do not rotate it casually.
 
-### Connect
+Then **Deployments** → the newest one → **Redeploy**. Environment variables are
+read at build time, so the values do nothing until you do this.
 
-Redeploy, then **Settings → Microsoft 365 → Connect**. You pick the account,
-Microsoft asks for consent, and you land back on Settings. The card then lists
-which capabilities were actually granted — a partial grant is normal, and each
-line says what still works without it.
+### Step 5 — Connect
 
-Disconnecting from that card makes Basecamp forget the tokens. It does not
-revoke the app at Microsoft; that is done in your own account's *My Apps*.
+In Basecamp: **Settings** → **Microsoft 365** → **Connect**.
+
+Microsoft asks which account, then shows the consent screen listing exactly
+the permissions from step 3. Approve, and you land back on Settings.
+
+The card then lists what was actually granted, one line per capability. A
+partial grant is normal and each line says what still works without it.
+
+### When it does not work
+
+| What you see | What it means |
+|---|---|
+| No Connect button, "Missing: …" | The environment variables are not live. Redeploy after adding them. |
+| `AADSTS50011` redirect mismatch | The URI in step 1 does not match. The error names what it expected. |
+| "An administrator has to approve" | Your tenant has user consent switched off. Send them this section. |
+| `AADSTS7000215` invalid client secret | You copied `Secret ID` instead of `Value`, or the secret expired. |
+| Connected, but "Calendar reading wasn't granted" | Consent was partial. Reconnect and approve everything. |
+| Worked for weeks, now says reconnect | Usually an expired client secret (step 2) or a password change. |
+
+Disconnecting from the Settings card makes Basecamp forget the tokens. It does
+not revoke the app at Microsoft — do that at <https://myapps.microsoft.com>.

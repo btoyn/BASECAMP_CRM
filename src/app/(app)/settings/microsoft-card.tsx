@@ -3,7 +3,7 @@ import { CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SCOPE_FOR, describeMissingConfig } from "@/lib/microsoft/config";
+import { SCOPE_FOR, describeMissingConfig, scopeSatisfied } from "@/lib/microsoft/config";
 import { getConnection } from "@/lib/microsoft/tokens";
 import { formatDate } from "@/lib/utils";
 
@@ -42,8 +42,7 @@ export async function MicrosoftCard({ result }: { result?: string }) {
   const connection = missingConfig ? null : await getConnection();
   const message = result ? RESULT_MESSAGE[result] : undefined;
 
-  const has = (scope: string) =>
-    connection?.scopes.some((s) => s.toLowerCase() === scope.toLowerCase()) ?? false;
+  const has = (scope: string) => scopeSatisfied(connection?.scopes ?? [], scope);
   const live = Boolean(connection && !connection.invalidatedAt);
 
   return (

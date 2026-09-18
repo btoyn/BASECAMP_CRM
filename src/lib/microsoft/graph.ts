@@ -1,5 +1,5 @@
 import "server-only";
-import { GRAPH_BASE, SCOPE_FOR } from "./config";
+import { GRAPH_BASE, SCOPE_FOR, scopeSatisfied } from "./config";
 import { getAccessToken } from "./tokens";
 import {
   busyBlocksFromSchedule,
@@ -34,7 +34,7 @@ async function graphFetch(
 
   // A partial consent is normal: an admin can grant calendar and withhold mail.
   // Better to say which half is missing than to send a request that 403s.
-  if (init.scope && !auth.scopes.some((s) => s.toLowerCase() === init.scope!.toLowerCase())) {
+  if (init.scope && !scopeSatisfied(auth.scopes, init.scope)) {
     return { ok: false, failure: "missing_scope", detail: init.scope };
   }
 
