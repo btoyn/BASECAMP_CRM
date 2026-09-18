@@ -32,7 +32,9 @@ describe("outcome mapping", () => {
   });
 
   it("reads a loan's closing outcome", () => {
-    expect(loanOutcome("sent_to_closing")).toBe("funded");
+    expect(loanOutcome("sba_approved")).toBe("funded");
+    // The retired value must not quietly keep counting as a win.
+    expect(loanOutcome("sent_to_closing")).toBe("open");
     expect(loanOutcome("did_not_happen")).toBe("died");
     expect(loanOutcome(null)).toBe("open");
   });

@@ -29,7 +29,7 @@ const PRIMARY_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, count: null },
   { href: "/spheres", label: "Spheres", icon: Orbit, count: "needsAttention" },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare, count: "looksDue" },
-  { href: "/loans", label: "Loan updates", icon: Banknote, count: "loansDue" },
+  { href: "/loans", label: "Loans", icon: Banknote, count: "loansDue" },
   { href: "/follow-ups", label: "Follow-ups", icon: CheckSquare, count: "followUps" },
 ] as const;
 

@@ -45,9 +45,14 @@ export function lookOutcome(status: string): ReferralOutcome {
   return "open";
 }
 
-/** A loan's closing outcome, same mapping. */
+/**
+ * A loan's closing outcome, same mapping.
+ *
+ * `sba_approved` is the win: approval is the finish line he works towards, and
+ * what the closing department does afterwards is not his to report on.
+ */
 export function loanOutcome(closingOutcome: string | null): ReferralOutcome {
-  if (closingOutcome === "sent_to_closing") return "funded";
+  if (closingOutcome === "sba_approved") return "funded";
   if (closingOutcome === "did_not_happen") return "died";
   return "open";
 }

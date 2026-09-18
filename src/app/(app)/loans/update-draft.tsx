@@ -134,6 +134,9 @@ export function UpdateDraft({
         body,
         toBorrower,
         closing: mode === "handoff",
+        // Wall-clock, from the browser: which day an approval landed on is a
+        // calendar fact, and the server's UTC midnight is a different day.
+        approvedOn: mode === "handoff" ? todayLocal() : null,
       });
       if (result.error) {
         setError(result.error);
@@ -264,4 +267,11 @@ export function UpdateDraft({
       </p>
     </div>
   );
+}
+
+/** Today as the browser reckons it. */
+function todayLocal(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

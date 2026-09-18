@@ -20,7 +20,7 @@ export default async function LoansPage() {
     supabase
       .from("active_loans")
       .select(
-        "id, borrower_name, updates_active, last_update_sent_at, next_update_due_at, closing_outcome, lender:lenders(id, full_name, institution:institutions(name))",
+        "id, borrower_name, updates_active, last_update_sent_at, next_update_due_at, closing_outcome, sba_approval_date, approved_sba_amount, lender:lenders(id, full_name, institution:institutions(name))",
       )
       .is("deleted_at", null)
       .order("next_update_due_at", { nullsFirst: false }),
@@ -50,6 +50,8 @@ export default async function LoansPage() {
       institution: lender?.institution?.name ?? null,
       active: l.updates_active,
       closingOutcome: l.closing_outcome,
+      approvedOn: l.sba_approval_date,
+      approvedAmount: l.approved_sba_amount,
       lastUpdateAt: l.last_update_sent_at,
       daysLate: Math.max(0, daysLate),
       state: loanState(daysLate, l.updates_active),
@@ -65,8 +67,8 @@ export default async function LoansPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Loan updates"
-        description="Every active loan gets a touch each week, even when nothing has changed."
+        title="Loans"
+        description="Every active loan gets a touch each week, even when nothing has changed. Approved ones move to their own tab."
       />
       <LoanList rows={rows} lenders={lenderOptions} />
     </div>
