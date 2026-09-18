@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { QuickLog } from "@/components/quick-log";
-import { BasecampLockup } from "@/components/brand";
+import { NorthLockup } from "@/components/brand";
 import type { NavCounts, QuickLogData } from "@/lib/data";
 
 /**
@@ -157,7 +157,7 @@ export function AppShell({
       {/* Light sidebar, primary navigation grouped away from utilities */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-4 md:flex">
         <Link href="/dashboard" className="mb-5 flex items-center px-1.5">
-          <BasecampLockup size={16} />
+          <NorthLockup size={16} />
         </Link>
 
         <QuickLog data={quickLog}>

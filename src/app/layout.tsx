@@ -13,12 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Basecamp", template: "%s · Basecamp" },
+  title: { default: "North", template: "%s · North" },
   description: "Personal lender relationship and communication command center",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Basecamp",
+    title: "North",
     statusBarStyle: "default",
   },
 };

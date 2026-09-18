@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
-/* Basecamp theme — light mode only. Color carries meaning here: royal blue for
+/* North theme — light mode only. Color carries meaning here: royal blue for
    relationship activity and primary actions, sunrise gold for pending work,
    alpine teal for confirmed and healthy, muted plum for personal relationship
    intelligence, critical red for blocked or seriously overdue.
 
-   The three --brand-* values are the logo's own colors and must not drift; the
+   The four --brand-* values are the compass logo's own colors and must not drift; the
    interface tokens below are derived from them. Teal, plum and red are not in
    the brand palette on purpose — they carry status meaning, not identity, and a
-   three-color palette cannot express five states. */
+   four-color palette cannot express five states. */
 :root {
-  --brand-navy: #0b1d3a;
-  --brand-blue: #1e5bff;
-  --brand-gold: #f2b94b;
+  --brand-slate: #2b3646;
+  --brand-blue: #1e76ff;
+  --brand-blue-deep: #1a4fb0;
+  --brand-grey: #a8b1bd;
 
   --background: #f5f7fb;
   --surface: #ffffff;
@@ -75,9 +76,10 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
   --color-primary-foreground: var(--primary-foreground);
-  --color-brand-navy: var(--brand-navy);
+  --color-brand-slate: var(--brand-slate);
   --color-brand-blue: var(--brand-blue);
-  --color-brand-gold: var(--brand-gold);
+  --color-brand-blue-deep: var(--brand-blue-deep);
+  --color-brand-grey: var(--brand-grey);
   --color-navy: var(--navy);
   --color-navy-soft: var(--navy-soft);
   --color-gold: var(--gold);

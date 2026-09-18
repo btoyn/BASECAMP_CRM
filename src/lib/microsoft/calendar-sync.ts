@@ -6,7 +6,7 @@ import { createCalendarEvent } from "./graph";
  * Putting a confirmed meeting on the real calendar.
  *
  * Best effort, always. By the time this runs he has pressed Confirm and the
- * meeting exists in Basecamp; a calendar that won't answer is a thing to tell
+ * meeting exists in North; a calendar that won't answer is a thing to tell
  * him about later, not a reason to undo what he just did. So every failure
  * here is swallowed, logged, and leaves `external_calendar_event_id` null —
  * which is exactly the state every meeting has had until now.

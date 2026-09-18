@@ -252,7 +252,7 @@ describe("authorizeUrl", () => {
     const url = new URL(
       authorizeUrl({
         config,
-        redirectUri: redirectUriFor("https://basecamp.example.com"),
+        redirectUri: redirectUriFor("https://north.example.com"),
         state: "state-abc",
         codeChallenge: "challenge-xyz",
       }),
@@ -266,7 +266,7 @@ describe("authorizeUrl", () => {
     expect(url.searchParams.get("code_challenge")).toBe("challenge-xyz");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
     expect(url.searchParams.get("redirect_uri")).toBe(
-      "https://basecamp.example.com/api/microsoft/callback",
+      "https://north.example.com/api/microsoft/callback",
     );
     // Without offline_access the connection dies in an hour.
     expect(url.searchParams.get("scope")).toContain("offline_access");

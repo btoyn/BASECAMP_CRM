@@ -63,7 +63,7 @@ a phone. To swap the picture later, replace that file; no code changes needed.
 
 ## 5. Connecting Microsoft 365
 
-Everything here is one-time setup. Until it is done, Basecamp behaves exactly as
+Everything here is one-time setup. Until it is done, North behaves exactly as
 it did before: dates come from your availability windows and the meetings it
 already knows about, and the ask opens in your mail client through a `mailto:`
 link. Nothing breaks while this is undone.
@@ -73,11 +73,11 @@ Budget twenty minutes. You will end up with four values to paste into Vercel.
 ### What you are actually asking Microsoft for
 
 An **app registration** is a record in your organisation's directory saying
-"an application called Basecamp exists, and may ask people here for
+"an application called North exists, and may ask people here for
 permission". On its own it grants nothing.
 
-Basecamp then asks **you, personally**, for these. They are *delegated*
-permissions, which means Basecamp acts as you, with your own access, and can
+North then asks **you, personally**, for these. They are *delegated*
+permissions, which means North acts as you, with your own access, and can
 never reach anything you could not reach yourself:
 
 | Permission | What it buys | What it does not do |
@@ -89,7 +89,7 @@ never reach anything you could not reach yourself:
 | `Mail.Send` | Sending directly, if you ever switch it on | Nothing calls this today |
 
 You can revoke the whole thing at any time from
-<https://myapps.microsoft.com> → the Basecamp tile → *Manage* → *Revoke*.
+<https://myapps.microsoft.com> → the North tile → *Manage* → *Revoke*.
 
 ### Do you need IT?
 
@@ -102,7 +102,7 @@ consent for apps from verified publishers, for selected permissions", and
 "selected permissions" means Microsoft's low-impact set — `User.Read`,
 `offline_access`, `openid`, `profile`, `email`. **`Calendars.ReadWrite`,
 `Mail.ReadWrite` and `Mail.Send` are not in that set.** They are precisely the
-class carved out of self-consent, and Basecamp will not be a verified
+class carved out of self-consent, and North will not be a verified
 publisher.
 
 Check which policy `im504.com` is on: **Identity → Enterprise applications →
@@ -122,7 +122,7 @@ Go to <https://entra.microsoft.com> and sign in with your work account.
    <https://portal.azure.com> → search "App registrations". Same screens.)*
 2. **+ New registration**.
 3. Fill in:
-   - **Name**: `Basecamp` — this is the name you will see on the consent
+   - **Name**: `North` — this is the name you will see on the consent
      screen, so make it one you will recognise.
    - **Supported account types**: *Accounts in this organizational directory
      only (im504 only - Single tenant)*.
@@ -148,7 +148,7 @@ You land on the Overview page. Copy two values from it now:
 
 1. Left menu → **Certificates & secrets** → **Client secrets** tab →
    **+ New client secret**.
-2. Description: `Basecamp on Vercel`. Expiry: 24 months is the usual maximum.
+2. Description: `North on Vercel`. Expiry: 24 months is the usual maximum.
 3. **Add**.
 4. **Copy the `Value` column immediately.** Not `Secret ID` — the one next to
    it. It is shown once and never again; if you navigate away you delete it
@@ -186,7 +186,7 @@ deployments to work too — they need their own redirect URI added in step 1).
 | `MICROSOFT_TOKEN_ENCRYPTION_KEY` | A long random string — `openssl rand -base64 48` |
 
 `MICROSOFT_TOKEN_ENCRYPTION_KEY` encrypts the refresh tokens before they are
-written to the database. It is not optional: without it, Basecamp refuses to
+written to the database. It is not optional: without it, North refuses to
 start the connection rather than store standing mailbox access in the clear.
 **Changing it later makes every existing connection unreadable** — the fix is
 to reconnect, but do not rotate it casually.
@@ -196,7 +196,7 @@ read at build time, so the values do nothing until you do this.
 
 ### Step 5 — Connect
 
-In Basecamp: **Settings** → **Microsoft 365** → **Connect**.
+In North: **Settings** → **Microsoft 365** → **Connect**.
 
 Microsoft asks which account, then shows the consent screen listing exactly
 the permissions from step 3. Approve, and you land back on Settings.
@@ -215,5 +215,5 @@ partial grant is normal and each line says what still works without it.
 | Connected, but "Calendar reading wasn't granted" | Consent was partial. Reconnect and approve everything. |
 | Worked for weeks, now says reconnect | Usually an expired client secret (step 2) or a password change. |
 
-Disconnecting from the Settings card makes Basecamp forget the tokens. It does
+Disconnecting from the Settings card makes North forget the tokens. It does
 not revoke the app at Microsoft — do that at <https://myapps.microsoft.com>.

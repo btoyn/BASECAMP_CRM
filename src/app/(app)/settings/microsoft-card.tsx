@@ -20,11 +20,11 @@ const RESULT_MESSAGE: Record<string, { tone: "good" | "bad"; text: string }> = {
   connected: { tone: "good", text: "Connected. Proposed dates now check your real calendar." },
   disconnected: {
     tone: "good",
-    text: "Disconnected. Basecamp has forgotten the tokens — revoke its access in your Microsoft account too if you want it gone entirely.",
+    text: "Disconnected. North has forgotten the tokens — revoke its access in your Microsoft account too if you want it gone entirely.",
   },
   consent_denied: {
     tone: "bad",
-    text: "Microsoft refused the request. On a work account this usually means an administrator has to approve Basecamp for your organisation first.",
+    text: "Microsoft refused the request. On a work account this usually means an administrator has to approve North for your organisation first.",
   },
   state_mismatch: {
     tone: "bad",
@@ -55,7 +55,7 @@ export async function MicrosoftCard({ result }: { result?: string }) {
               Microsoft 365
             </CardTitle>
             <CardDescription>
-              Lets Basecamp read your calendar so the dates it offers are ones you&apos;re
+              Lets North read your calendar so the dates it offers are ones you&apos;re
               actually free for, and put the confirmed meeting on your calendar.
             </CardDescription>
           </div>
@@ -86,7 +86,7 @@ export async function MicrosoftCard({ result }: { result?: string }) {
               Missing: <code className="text-foreground">{missingConfig}</code>
             </p>
             <p className="text-[12.5px] text-muted">
-              Everything else in Basecamp works without it — dates are suggested from your
+              Everything else in North works without it — dates are suggested from your
               availability windows and the meetings it already knows about.
             </p>
           </>
@@ -124,7 +124,7 @@ export async function MicrosoftCard({ result }: { result?: string }) {
               <ScopeLine
                 granted={has(SCOPE_FOR.createEvent)}
                 on="Confirming a meeting puts it on your calendar and invites them"
-                off="Calendar writing wasn't granted — confirmed meetings stay in Basecamp only"
+                off="Calendar writing wasn't granted — confirmed meetings stay in North only"
               />
               <ScopeLine
                 granted={has(SCOPE_FOR.draftMail)}
@@ -145,7 +145,7 @@ export async function MicrosoftCard({ result }: { result?: string }) {
         ) : (
           <>
             <p className="text-muted">
-              Basecamp asks for your calendar and the ability to draft mail. It never sends
+              North asks for your calendar and the ability to draft mail. It never sends
               anything on its own — you still press send, and you still press Confirm.
             </p>
             <Link
@@ -155,7 +155,7 @@ export async function MicrosoftCard({ result }: { result?: string }) {
               Connect Microsoft 365
             </Link>
             <p className="text-[12.5px] text-muted">
-              On a work account an administrator may need to approve Basecamp for your
+              On a work account an administrator may need to approve North for your
               organisation the first time.
             </p>
           </>

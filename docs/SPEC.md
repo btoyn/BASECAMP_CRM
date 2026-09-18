@@ -1,4 +1,4 @@
-# Basecamp — what it is, and what it isn't
+# North — what it is, and what it isn't
 
 Written 18 Sep 2026, from an interview with Brandon. This is the decision
 record: what the app is for, what gets cut, and what the rules are. When code
@@ -39,7 +39,7 @@ feature was gated behind a setup step nobody was told to do.
 
 ## 2. The one-sentence version
 
-> Basecamp is the book of record for the bankers who send Brandon deals: who
+> North is the book of record for the bankers who send Brandon deals: who
 > they are, what they've sent, when he last saw them, and what's next on the
 > calendar.
 
@@ -109,11 +109,11 @@ often.
 
 ### A does not mean "has a row in this database"
 
-Only 14 of the 33 A's show a deal in Basecamp. That is not a contradiction —
+Only 14 of the 33 A's show a deal in North. That is not a contradiction —
 the deal history predates the tool, and some are in flight right now. The
 consequence is a rule:
 
-> **Basecamp never sets or changes a tier on its own.** Not from deal count,
+> **North never sets or changes a tier on its own.** Not from deal count,
 > not from how long it has been. The tier is his judgement, and the app's job
 > is to remember it.
 
@@ -158,13 +158,13 @@ The current flow asks him to pick dates by hand, generate an email, paste it
 into Outlook, wait, copy the reply back in, and confirm. That is why it has
 zero uses. What he asked for:
 
-1. Basecamp **reads his Outlook calendar** and proposes two or three real
+1. North **reads his Outlook calendar** and proposes two or three real
    openings.
 2. It **writes the email and leaves it in his Outlook drafts.** He proofs it
    and presses send. Not auto-send — decided, and not "start with drafts and
    graduate later" either. Drafts, full stop.
 3. It **watches for the reply and reads it itself.** He should not copy
-   anything back into the app. "Tuesday works" should show up in Basecamp as
+   anything back into the app. "Tuesday works" should show up in North as
    Tuesday winning.
 4. He presses Confirm. It goes on the calendar with the invite.
 
@@ -196,18 +196,18 @@ his own ten minutes, not an IT ticket — see §9.
 ## 9. The Microsoft question, answered
 
 **What is being asked for.** An "app registration" in Microsoft Entra ID — a
-record saying "an application called Basecamp exists, and may ask users of this
-tenant for permission". It grants nothing by itself. Basecamp then asks
+record saying "an application called North exists, and may ask users of this
+tenant for permission". It grants nothing by itself. North then asks
 Brandon, personally, for four delegated permissions:
 
-| Permission | What it lets Basecamp do | What it does NOT do |
+| Permission | What it lets North do | What it does NOT do |
 |---|---|---|
 | `Calendars.ReadWrite` | See when he's busy; create the confirmed meeting | Touch anyone else's calendar |
 | `Mail.ReadWrite` | Read replies to its own asks; leave drafts in his Outlook | Send anything |
 | `Mail.Send` | Send, if he ever turns that on | Nothing is sent today — the code path exists and is uncalled |
 | `offline_access` | Stay connected past one hour | — |
 
-"Delegated" is the important word: Basecamp acts **as Brandon, with Brandon's
+"Delegated" is the important word: North acts **as Brandon, with Brandon's
 own access**, and can never see more than he can. It reaches nobody else's
 mailbox. He can revoke it from his Microsoft account page at any moment.
 

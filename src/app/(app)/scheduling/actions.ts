@@ -287,7 +287,7 @@ export async function bookProposal(
   });
   if (attendeeError) return { error: attendeeError.message };
 
-  // Best effort: the meeting is booked in Basecamp either way. A calendar that
+  // Best effort: the meeting is booked in North either way. A calendar that
   // won't answer must not undo a confirmation he already pressed.
   await addConfirmedMeetingToCalendar({
     meetingId: meeting.id,

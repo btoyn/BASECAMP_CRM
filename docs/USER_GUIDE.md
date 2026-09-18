@@ -1,4 +1,4 @@
-# Basecamp — Working Guide
+# North — Working Guide
 
 One system for your ~140 commercial lenders across Salt Lake City and St. George. It answers one
 question — *who is slipping?* — in five minutes a day. Your real list is loaded; this is not a demo.
@@ -392,7 +392,7 @@ scheduling — plan for both.
 ### Meanwhile: Claude in Outlook is already approved
 
 IT has deployed the Claude add-in for Outlook, which is a different thing from the items above — it
-sits in the Outlook sidebar, for you, and Basecamp cannot talk to it. But it is useful today. Open a
+sits in the Outlook sidebar, for you, and North cannot talk to it. But it is useful today. Open a
 lender's reply and ask it what they are proposing; ask it to draft the lunch email in your voice. You
 still move the text across by hand, so it does not remove the paste — it just means the drafting and
 reading you want are available now rather than after the approvals land.

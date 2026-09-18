@@ -1,9 +1,9 @@
-# Basecamp — Product Spec
+# North — Product Spec
 
 *Relationships. Momentum. Results.*
 
 A lender-relationship system for an SBA 504 business development officer. This document
-describes what Basecamp is, the rules it enforces, and — more usefully — the decisions behind
+describes what North is, the rules it enforces, and — more usefully — the decisions behind
 those rules and the alternatives that were deliberately rejected. It is the reference for anyone
 picking this project up.
 
@@ -24,7 +24,7 @@ Wasatch Front (Salt Lake City) and Southern Utah (St. George). One user today; d
 commercial lenders at banks and credit unions who bring him deals that don't fit their own box.
 His book is ~142 lenders across 24 institutions. His product is the relationship.
 
-**The problem Basecamp solves.** Those relationships lived in a spreadsheet of names. A
+**The problem North solves.** Those relationships lived in a spreadsheet of names. A
 spreadsheet cannot answer the three questions that decide whether a territory produces:
 
 1. **Who haven't I talked to in six weeks?** Relationships go quiet gradually and silently.
@@ -33,7 +33,7 @@ spreadsheet cannot answer the three questions that decide whether a territory pr
 3. **Does this referral partner know where their loan stands?** Silence after a handoff costs the
    next referral.
 
-Basecamp answers all three, and drafts the outreach that follows from the answers.
+North answers all three, and drafts the outreach that follows from the answers.
 
 **The one-sentence test for any feature:** does it help him know who to contact, contact them, or
 keep a partner informed? If not, it does not belong.
@@ -304,22 +304,33 @@ Stated plainly so they don't get rebuilt:
 
 ## 11. Brand
 
-Renamed from "Lender CRM" to **Basecamp** in August 2026. Mark is a mountain-and-sun; the tagline
-is *Relationships. Momentum. Results.*
+Renamed twice: "Lender CRM" to **Basecamp** in August 2026, and Basecamp to
+**North** in September 2026. The mark is a compass rose, and the primary lockup
+puts it to the left of the wordmark.
 
-| Token | Value |
-|---|---|
-| `--brand-navy` | `#0B1D3A` |
-| `--brand-blue` | `#1E5BFF` |
-| `--brand-gold` | `#F2B94B` |
+| Token | Value | Where it lands |
+|---|---|---|
+| `--brand-blue` | `#1E76FF` | The north arrowhead, and the right half of the needle |
+| `--brand-blue-deep` | `#1A4FB0` | The left half of the needle |
+| `--brand-slate` | `#2B3646` | East and west arrowheads, and the wordmark |
+| `--brand-grey` | `#A8B1BD` | The ring, and the south arrowhead |
 
-The interface derives from these, with two deliberate departures:
+Colour carries the meaning in this mark. North is the bright blue, east and
+west are slate, south is grey, and the needle splits down its centre line so it
+reads as a pointer rather than a flat triangle. Anything that renders the rose
+in one colour keeps that hierarchy through opacity instead — `NorthMarkMono`.
 
-- **Interface gold is darker** (`#9A6F14`). `#F2B94B` is a tint, not a text colour; badges need
-  contrast the logo doesn't have to provide.
-- **Teal, plum and red are not brand colours.** They carry *status* meaning — on track, personal
-  intelligence, overdue — and three brand colours cannot express five states.
+The interface derives from these, with one deliberate departure:
 
-The mark is vector, traced from the brand sheet raster (`docs/brand/basecamp-brand-sheet.png`) and
-living in `src/components/brand.tsx`. If a real vector file ever arrives, replacing the paths there
-changes nothing else.
+- **Teal, plum and red are not brand colours.** They carry *status* meaning — on
+  track, personal intelligence, overdue — and four brand colours cannot express
+  five states.
+
+The mark is vector and lives in `src/components/brand.tsx`, drawn from the
+reference art in `docs/brand/north-lockup.png` and `docs/brand/north-mark.png`
+rather than traced from it. The ring is four explicit arcs rather than a dashed
+circle, because a dash pattern puts its gaps where the arithmetic lands and
+these four have to sit exactly under the four arrowheads.
+
+`docs/brand/basecamp-brand-sheet.png` is the retired mountain-and-sun mark,
+kept only as a record of what it replaced.

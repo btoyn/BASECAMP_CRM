@@ -5,7 +5,7 @@ export default function SetupPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle className="text-xl">Basecamp needs a database</CardTitle>
+          <CardTitle className="text-xl">North needs a database</CardTitle>
           <CardDescription>
             The app is deployed but not yet connected to Supabase.
           </CardDescription>
