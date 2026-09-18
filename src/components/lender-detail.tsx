@@ -9,7 +9,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getPreferences } from "@/lib/data";
 import { lenderCoverage } from "@/lib/coverage";
 import { tierGoalDays } from "@/lib/tiers";
-import { LOOK_STAGE, isLookOpen, lookTitle } from "@/lib/looks";
+import { isLookOpen, lookTitle, readLookStatus } from "@/lib/looks";
+import {
+  describeReferrals,
+  loanOutcome,
+  lookOutcome,
+  tallyReferrals,
+  type Referral,
+} from "@/lib/referrals";
 import {
   ACTIVITY_TYPE_LABELS,
   HEALTH_LABELS,
@@ -129,12 +136,30 @@ export async function LenderDetail({
 
   const lastActivity = activities?.[0] ?? null;
 
-  // Looks: the lifetime count is what says whether this relationship produces;
-  // the open ones are what still needs a reply.
+  // The open looks are what still needs a reply; the lifetime count now lives
+  // in the referral tally below, which counts loans as well.
   const openLooks = (opportunities ?? []).filter((o) => isLookOpen(o.stage));
-  const becameLoans = (opportunities ?? []).filter(
-    (o) => o.stage === LOOK_STAGE.becameLoan,
-  ).length;
+
+  /* What this lender has actually sent you. Looks and loans both count, and a
+     deal that died counts the same as one that funded — they still brought it.
+     Most loans never pass through a logged look, so counting looks alone
+     under-reports the people who send the most. */
+  const referrals: Referral[] = [
+    ...(opportunities ?? []).map((o) => ({
+      id: o.id,
+      lenderId: id,
+      kind: "look" as const,
+      outcome: lookOutcome(readLookStatus(o.look_status)),
+    })),
+    ...(loans ?? []).map((l) => ({
+      id: l.id,
+      lenderId: id,
+      kind: "loan" as const,
+      outcome: loanOutcome(l.closing_outcome),
+      fromLookId: l.opportunity_id,
+    })),
+  ];
+  const referralTally = tallyReferrals(referrals).get(id);
 
   const nextMeeting = (upcomingMeetings ?? [])
     .map((r) => r.meeting as unknown as { id: string; title: string; start_at: string; status: string; location_name: string | null })
@@ -214,21 +239,22 @@ export async function LenderDetail({
             ))}
           </div>
         )}
-        {(opportunities ?? []).length > 0 && (
+        {referralTally && (
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Looks given</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">
+              Deals referred
+            </p>
             <p className="mt-0.5 text-sm">
               <Link href="/pipeline" className="font-semibold text-primary hover:underline">
-                {(opportunities ?? []).length}
+                {referralTally.total}
               </Link>{" "}
-              <span className="text-muted">
-                {becameLoans > 0
-                  ? `· ${becameLoans} became a loan`
-                  : openLooks.length > 0
-                    ? `· ${openLooks.length} still open`
-                    : "· none open"}
-              </span>
+              <span className="text-muted">{describeReferrals(referralTally).split(" · ").slice(1).join(" · ")}</span>
             </p>
+            {referralTally.died > 0 && (
+              <p className="mt-0.5 text-xs text-muted">
+                Dead deals still count — they sent them.
+              </p>
+            )}
             {openLooks.map((o) => (
               <p key={o.id} className="mt-0.5 text-sm">
                 {lookTitle({ borrowerName: o.borrower_name, notes: o.notes })}

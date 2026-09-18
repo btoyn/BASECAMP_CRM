@@ -15,6 +15,7 @@ import {
   type LookState,
   type LookStatus,
 } from "@/lib/looks";
+import { describeReferrals } from "@/lib/referrals";
 import { cn, relativeDays } from "@/lib/utils";
 import { deleteLook, logLook, moveLook } from "./actions";
 
@@ -52,6 +53,15 @@ export interface LookLender {
   institution: string | null;
 }
 
+/** A lender and everything they've sent you, however it ended. */
+export interface ReferrerRow {
+  id: string;
+  name: string;
+  count: number;
+  funded: number;
+  died: number;
+}
+
 const STATE_STYLE: Record<LookState, { dot: string; label: string; tone: string }> = {
   scheduled: { dot: "bg-teal", label: "Follow-up set", tone: "text-teal" },
   due: { dot: "bg-gold", label: "Follow up now", tone: "text-[#8a6215]" },
@@ -69,7 +79,7 @@ export function PipelineBoard({
 }: {
   rows: LookRow[];
   lenders: LookLender[];
-  topLenders: { id: string; name: string; count: number }[];
+  topLenders: ReferrerRow[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -205,20 +215,33 @@ export function PipelineBoard({
         <Card>
           <CardContent className="pt-6">
             <p className="mb-1 text-[13px] font-semibold">Who&apos;s reaching out</p>
-            <p className="mb-3 text-[12.5px] text-muted">Looks brought to you, most first</p>
-            <ul className="space-y-2">
+            <p className="mb-3 text-[12.5px] text-muted">
+              Every deal they&apos;ve brought you — looks and loans, funded or not
+            </p>
+            <ul className="space-y-2.5">
               {topLenders.map((l) => (
                 <li key={l.id} className="flex items-center gap-3">
-                  <Link
-                    href={`/lenders/${l.id}`}
-                    className="min-w-0 flex-1 truncate text-[13.5px] font-medium hover:underline"
-                  >
-                    {l.name}
-                  </Link>
+                  <span className="min-w-0 flex-1">
+                    <Link
+                      href={`/lenders/${l.id}`}
+                      className="block truncate text-[13.5px] font-medium hover:underline"
+                    >
+                      {l.name}
+                    </Link>
+                    <span className="block text-[11.5px] text-muted">
+                      {describeReferrals({
+                        lenderId: l.id,
+                        total: l.count,
+                        funded: l.funded,
+                        died: l.died,
+                        open: l.count - l.funded - l.died,
+                      })}
+                    </span>
+                  </span>
                   <div
                     aria-hidden="true"
                     className="h-1.5 rounded-full bg-primary"
-                    style={{ width: `${(l.count / topLenders[0].count) * 40 + 8}%` }}
+                    style={{ width: `${(l.count / topLenders[0].count) * 30 + 8}%` }}
                   />
                   <span className="w-6 shrink-0 text-right text-[13px] tabular-nums text-muted">
                     {l.count}

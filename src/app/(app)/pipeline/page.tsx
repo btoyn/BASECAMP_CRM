@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { daysBetween, lookState, readLookStatus } from "@/lib/looks";
+import { loanOutcome, lookOutcome, rankReferrers, type Referral } from "@/lib/referrals";
 import { PipelineBoard, type LookLender, type LookRow } from "./pipeline-board";
 
 export const metadata = { title: "Pipeline" };
@@ -17,7 +18,7 @@ export default async function PipelinePage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [{ data: looks }, { data: lenders }] = await Promise.all([
+  const [{ data: looks }, { data: lenders }, { data: loans }] = await Promise.all([
     supabase
       .from("opportunities")
       .select(
@@ -31,6 +32,12 @@ export default async function PipelinePage() {
       .is("deleted_at", null)
       .eq("active", true)
       .order("full_name"),
+    // Loans count as referrals too — most deals arrive already real enough to
+    // track weekly and never pass through a logged look.
+    supabase
+      .from("active_loans")
+      .select("id, lender_id, opportunity_id, closing_outcome, lender:lenders(full_name)")
+      .is("deleted_at", null),
   ]);
 
   const rows: LookRow[] = (looks ?? []).map((o) => {
@@ -66,19 +73,43 @@ export default async function PipelinePage() {
     institution: (l.institution as unknown as { name: string } | null)?.name ?? null,
   }));
 
-  // Who is actually reaching out — the count the original plan called the one
-  // number worth measuring.
-  const byLender = new Map<string, { name: string; count: number }>();
+  /* Who is actually reaching out — the count the original plan called the one
+     number worth measuring. Looks and loans both count, and a deal that died
+     counts the same as one that funded: it was still handed to you. */
+  const names = new Map<string, string>();
+  const referrals: Referral[] = [];
+
   for (const row of rows) {
-    if (!row.lenderId || !row.lenderName) continue;
-    const entry = byLender.get(row.lenderId) ?? { name: row.lenderName, count: 0 };
-    entry.count += 1;
-    byLender.set(row.lenderId, entry);
+    if (!row.lenderId) continue;
+    if (row.lenderName) names.set(row.lenderId, row.lenderName);
+    referrals.push({
+      id: row.id,
+      lenderId: row.lenderId,
+      kind: "look",
+      outcome: lookOutcome(row.status),
+    });
   }
-  const topLenders = [...byLender.entries()]
-    .map(([id, v]) => ({ id, ...v }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, 5);
+
+  for (const l of loans ?? []) {
+    if (!l.lender_id) continue;
+    const lender = l.lender as unknown as { full_name: string } | null;
+    if (lender?.full_name) names.set(l.lender_id, lender.full_name);
+    referrals.push({
+      id: l.id,
+      lenderId: l.lender_id,
+      kind: "loan",
+      outcome: loanOutcome(l.closing_outcome),
+      fromLookId: l.opportunity_id,
+    });
+  }
+
+  const topLenders = rankReferrers(referrals, (id) => names.get(id) ?? null).map((r) => ({
+    id: r.lenderId,
+    name: r.name,
+    count: r.total,
+    funded: r.funded,
+    died: r.died,
+  }));
 
   return (
     <>

@@ -52,6 +52,7 @@ export function LoanList({ rows, lenders }: { rows: LoanRow[]; lenders: LoanLend
   const closed = rows.filter((r) => !r.active);
   const needing = active.filter((r) => r.state !== "updated").length;
   const reachedClosing = closed.filter((r) => r.closingOutcome === "sent_to_closing").length;
+  const died = closed.filter((r) => r.closingOutcome === "did_not_happen").length;
 
   return (
     <div className="space-y-5">
@@ -98,10 +99,17 @@ export function LoanList({ rows, lenders }: { rows: LoanRow[]; lenders: LoanLend
       {closed.length > 0 && (
         <Card>
           <CardContent className="pt-6">
-            <p className="mb-3 text-[13px] font-semibold text-muted">
+            <p className="mb-1 text-[13px] font-semibold text-muted">
               No longer tracking ({closed.length})
               {reachedClosing > 0 && ` · ${reachedClosing} reached closing`}
+              {died > 0 && ` · ${died} died`}
             </p>
+            {died > 0 && (
+              <p className="mb-3 text-[12.5px] text-muted">
+                A deal that died still counts as a referral on the lender who sent it — the
+                weekly asking stops, the credit doesn&apos;t.
+              </p>
+            )}
             <ul className="divide-y divide-hairline">
               {closed.map((loan) => (
                 <LoanItem key={loan.id} loan={loan} />
@@ -296,9 +304,9 @@ function LoanItem({ loan }: { loan: LoanRow }) {
                 variant="quiet"
                 onClick={() => run(() => closeLoan(loan.id, "did_not_happen"))}
                 disabled={pending}
-                title="Didn't happen — stops the weekly updates, sends nothing"
+                title="Stops the weekly updates and sends nothing. The referral still counts."
               >
-                <XCircle className="h-3.5 w-3.5" />
+                <XCircle className="h-3.5 w-3.5" /> Deal died
               </Button>
             </>
           ) : (
