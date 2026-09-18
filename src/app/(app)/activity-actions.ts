@@ -65,7 +65,7 @@ export async function logActivity(input: LogActivityInput): Promise<{ error?: st
   }
 
   revalidatePath(`/lenders/${input.lenderId}`);
-  revalidatePath("/lenders");
+  revalidatePath("/spheres", "layout");
   revalidatePath("/dashboard");
   return {};
 }

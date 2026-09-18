@@ -5,7 +5,8 @@
  */
 
 export interface FeatureFlags {
-  /** Microsoft Graph integration (Outlook drafts, calendar). */
+  /** Microsoft Graph is configured on this deployment. A user still has to
+   *  connect their own account in Settings before anything reads a calendar. */
   microsoft: boolean;
   /** AI drafting and extraction. */
   ai: boolean;
@@ -22,7 +23,13 @@ export interface FeatureFlags {
 }
 
 export function getFlags(): FeatureFlags {
-  const microsoft = Boolean(process.env.MICROSOFT_CLIENT_ID);
+  // All three, not just the client id: without the encryption key the OAuth
+  // flow refuses to start rather than write refresh tokens in the clear.
+  const microsoft = Boolean(
+    process.env.MICROSOFT_CLIENT_ID &&
+      process.env.MICROSOFT_CLIENT_SECRET &&
+      process.env.MICROSOFT_TOKEN_ENCRYPTION_KEY,
+  );
   return {
     microsoft,
     ai: Boolean(process.env.ANTHROPIC_API_KEY) && process.env.AI_DISABLED !== "true",

@@ -1,6 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { lenderCoverage, type LenderCoverageResult } from "@/lib/coverage";
+import { qualifyingTouchAt, readTier, tierGoalDays } from "@/lib/tiers";
+import type { SphereRow } from "@/lib/spheres";
 import type { CoverageRow, Lender, UserPreferences } from "@/lib/types";
 
 export interface LenderWithCoverage extends Lender {
@@ -14,7 +16,14 @@ export async function getPreferences(): Promise<UserPreferences | null> {
   return data;
 }
 
-/** All active lenders joined with the coverage view, statuses computed. */
+/**
+ * All lenders joined with the coverage view, statuses computed.
+ *
+ * Each lender is measured against their own tier's window (A fortnightly, B
+ * monthly, C quarterly), with the workspace goal from Settings standing in for
+ * anyone untiered. One lender, one goal — every screen that reads this gets the
+ * same answer.
+ */
 export async function getLendersWithCoverage(): Promise<LenderWithCoverage[]> {
   const supabase = await createClient();
 
@@ -31,10 +40,8 @@ export async function getLendersWithCoverage(): Promise<LenderWithCoverage[]> {
   const coverageByLender = new Map<string, CoverageRow>(
     (coverage ?? []).map((c: CoverageRow) => [c.lender_id, c]),
   );
-  const opts = {
-    goalDays: prefs?.default_contact_goal_days ?? 30,
-    graceDays: prefs?.contact_grace_days ?? 10,
-  };
+  const workspaceGoal = prefs?.default_contact_goal_days ?? 30;
+  const graceDays = prefs?.contact_grace_days ?? 10;
 
   return ((lenders ?? []) as unknown as (Lender & { institution: { id: string; name: string } | null })[]).map(
     (l) => {
@@ -44,14 +51,63 @@ export async function getLendersWithCoverage(): Promise<LenderWithCoverage[]> {
         coverage: lenderCoverage(
           {
             lastVisibleTouchAt: c?.last_visible_touch_at ?? null,
-            lastPersonalTouchAt: c?.last_personal_touch_at ?? null,
+            lastPersonalTouchAt: qualifyingTouchAt(l.relationship_tier, {
+              personal: c?.last_personal_touch_at ?? null,
+              conversation: c?.last_conversation_at ?? null,
+            }),
             hasConfirmedFutureMeeting: c?.has_confirmed_future_meeting ?? false,
           },
-          opts,
+          { goalDays: tierGoalDays(l.relationship_tier, workspaceGoal), graceDays },
         ),
       };
     },
   );
+}
+
+/**
+ * Everything Spheres needs, in the shape the pure sphere predicates expect.
+ *
+ * The two extra flags — an active loan, an overdue promise — are the only
+ * things a saved view asks about that the coverage view doesn't know, so they
+ * are fetched once here rather than per sphere.
+ */
+export async function getSphereRows(): Promise<SphereRow[]> {
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [lenders, { data: loans }, { data: promises }] = await Promise.all([
+    getLendersWithCoverage(),
+    supabase.from("active_loans").select("lender_id").is("deleted_at", null),
+    supabase
+      .from("promises")
+      .select("lender_id")
+      .eq("status", "open")
+      .lt("due_at", today)
+      .is("deleted_at", null),
+  ]);
+
+  const loanLenders = new Set((loans ?? []).map((r) => r.lender_id));
+  const promiseLenders = new Set((promises ?? []).map((r) => r.lender_id));
+
+  return lenders.map((l) => ({
+    id: l.id,
+    fullName: l.full_name,
+    title: l.title,
+    isSample: l.is_sample,
+    active: l.active,
+    tier: readTier(l.relationship_tier),
+    territory: l.territory,
+    institution: l.institution?.name ?? null,
+    coverage: {
+      personal: l.coverage.personal,
+      visible: l.coverage.visible,
+      daysSincePersonal: l.coverage.daysSincePersonal,
+      daysSinceVisible: l.coverage.daysSinceVisible,
+      hasConfirmedFutureMeeting: l.coverage.hasConfirmedFutureMeeting,
+    },
+    hasActiveLoan: loanLenders.has(l.id),
+    hasOverduePromise: promiseLenders.has(l.id),
+  }));
 }
 
 export interface NavCounts {
@@ -115,15 +171,13 @@ export async function getNavCounts(): Promise<NavCounts> {
         .not("stage", "in", "(handed_off,dormant,closed_no_handoff)")
         .lte("next_follow_up_at", today)
         .is("deleted_at", null),
-      supabase.from("lenders").select("id, active").is("deleted_at", null),
+      supabase.from("lenders").select("id, active, relationship_tier").is("deleted_at", null),
       supabase.from("lender_coverage").select("*"),
       getPreferences(),
     ]);
 
-  const opts = {
-    goalDays: prefs?.default_contact_goal_days ?? 30,
-    graceDays: prefs?.contact_grace_days ?? 10,
-  };
+  const workspaceGoal = prefs?.default_contact_goal_days ?? 30;
+  const graceDays = prefs?.contact_grace_days ?? 10;
   const byLender = new Map<string, CoverageRow>(
     (coverage ?? []).map((c: CoverageRow) => [c.lender_id, c]),
   );
@@ -135,10 +189,13 @@ export async function getNavCounts(): Promise<NavCounts> {
       lenderCoverage(
         {
           lastVisibleTouchAt: c?.last_visible_touch_at ?? null,
-          lastPersonalTouchAt: c?.last_personal_touch_at ?? null,
+          lastPersonalTouchAt: qualifyingTouchAt(l.relationship_tier, {
+            personal: c?.last_personal_touch_at ?? null,
+            conversation: c?.last_conversation_at ?? null,
+          }),
           hasConfirmedFutureMeeting: c?.has_confirmed_future_meeting ?? false,
         },
-        opts,
+        { goalDays: tierGoalDays(l.relationship_tier, workspaceGoal), graceDays },
       ).personal !== "on_track"
     );
   }).length;

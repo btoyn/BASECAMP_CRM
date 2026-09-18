@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 import { normalizeName } from "@/lib/utils";
+import { isTier } from "@/lib/tiers";
 
 export interface DuplicateCandidate {
   id: string;
@@ -201,8 +202,58 @@ export async function createLender(input: CreateLenderInput): Promise<CreateLend
     newValue: { name: `${input.firstName} ${input.lastName}`.trim() },
   });
 
-  revalidatePath("/lenders");
+  revalidatePath("/spheres", "layout");
   redirect(`/lenders/${lender.id}`);
+}
+
+/**
+ * Sets a lender's tier.
+ *
+ * Its own action rather than a call to `updateLender` because the tier decides
+ * how often this person is chased — it is worth checking the value is one of
+ * the four rather than writing whatever arrives. Marks the tier as
+ * hand-picked, so nothing later decides it knows better.
+ */
+export async function setLenderTier(
+  lenderId: string,
+  tier: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in." };
+  if (!isTier(tier)) return { error: "That isn't a tier." };
+
+  const { data: before } = await supabase
+    .from("lenders")
+    .select("relationship_tier")
+    .eq("id", lenderId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!before) return { error: "Lender not found." };
+
+  const { error } = await supabase
+    .from("lenders")
+    .update({ relationship_tier: tier, manual_tier_override: true })
+    .eq("id", lenderId);
+  if (error) return { error: error.message };
+
+  await logAudit(supabase, user.id, {
+    entityType: "lender",
+    entityId: lenderId,
+    action: "update",
+    previousValue: { relationship_tier: before.relationship_tier },
+    newValue: { relationship_tier: tier },
+    undoAvailable: true,
+  });
+
+  // The tier changes how often they're due, so every count that reads coverage
+  // moves with it.
+  revalidatePath(`/lenders/${lenderId}`);
+  revalidatePath("/spheres", "layout");
+  revalidatePath("/dashboard");
+  return {};
 }
 
 export async function updateLender(
@@ -234,7 +285,7 @@ export async function updateLender(
   });
 
   revalidatePath(`/lenders/${lenderId}`);
-  revalidatePath("/lenders");
+  revalidatePath("/spheres", "layout");
   return {};
 }
 
@@ -257,8 +308,8 @@ export async function softDeleteLender(lenderId: string): Promise<void> {
     undoAvailable: true,
   });
 
-  revalidatePath("/lenders");
-  redirect("/lenders");
+  revalidatePath("/spheres", "layout");
+  redirect("/spheres");
 }
 
 export async function changeLenderInstitution(

@@ -243,11 +243,15 @@ function Cell({
   action: React.ReactNode;
   muted: boolean;
 }) {
+  /* The action sits under the text rather than beside it. Three cells share one
+     row from 640px up, which leaves each about 200px: "11 loan updates due"
+     and a button cannot both fit on that line, and side by side the count ran
+     straight under the button. Stacked, nothing collides at any width. */
   return (
-    <div className="flex items-center gap-3.5 p-5 sm:p-[22px]">
+    <div className="flex items-start gap-3.5 p-5 sm:p-[22px]">
       <IconCircle icon={icon} tone={tone} size="md" />
       <div className="min-w-0 flex-1">
-        <p className="flex items-baseline gap-1.5">
+        <p className="flex flex-wrap items-baseline gap-x-1.5">
           <span
             className={cn(
               "text-[22px] font-bold leading-none tabular-nums",
@@ -256,11 +260,11 @@ function Cell({
           >
             {count}
           </span>
-          <span className="text-[13px] font-medium text-muted">{label}</span>
+          <span className="min-w-0 text-[13px] font-medium text-muted">{label}</span>
         </p>
-        <p className="mt-1 truncate text-[12.5px] text-muted">{support}</p>
+        <p className="mt-1 text-[12.5px] text-muted">{support}</p>
+        {action && <div className="mt-2.5">{action}</div>}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }

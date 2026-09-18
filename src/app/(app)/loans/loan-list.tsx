@@ -3,15 +3,16 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Mail, Plus, RotateCcw, Search, Trash2, X, XCircle } from "lucide-react";
+import { BadgeCheck, Check, Mail, Plus, RotateCcw, Search, Trash2, X, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Label } from "@/components/ui/input";
 import { matchScore } from "@/lib/fuzzy";
 import type { LoanState } from "@/lib/loan-cadence";
-import { cn, relativeDays } from "@/lib/utils";
-import { closeLoan, createLoan, deleteLoan, reopenLoan } from "./actions";
+import { LOAN_OUTCOME_LABEL, approvedTotal, isLoanOutcome, parseAmount, splitLoanBook } from "@/lib/loans";
+import { cn, formatCurrency, formatDate, relativeDays } from "@/lib/utils";
+import { closeLoan, createLoan, deleteLoan, reopenLoan, setApprovedAmount } from "./actions";
 import { UpdateDraft } from "./update-draft";
 
 export interface LoanRow {
@@ -21,7 +22,9 @@ export interface LoanRow {
   lenderName: string | null;
   institution: string | null;
   active: boolean;
-  closingOutcome: "sent_to_closing" | "did_not_happen" | null;
+  closingOutcome: string | null;
+  approvedOn: string | null;
+  approvedAmount: number | null;
   lastUpdateAt: string | null;
   daysLate: number;
   state: LoanState;
@@ -40,77 +43,261 @@ const STATE_STYLE: Record<LoanState, { dot: string; label: string; tone: string 
   closed: { dot: "bg-[#c9cfdd]", label: "Not tracking", tone: "text-muted" },
 };
 
-const OUTCOME_LABEL: Record<"sent_to_closing" | "did_not_happen", string> = {
-  sent_to_closing: "Sent to closing",
-  did_not_happen: "Didn't happen",
-};
+/** Today as the browser reckons it — an approval lands on a calendar day. */
+function todayLocal(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 export function LoanList({ rows, lenders }: { rows: LoanRow[]; lenders: LoanLender[] }) {
   const [adding, setAdding] = useState(false);
+  const [tab, setTab] = useState<"active" | "approved">("active");
 
-  const active = rows.filter((r) => r.active);
-  const closed = rows.filter((r) => !r.active);
-  const needing = active.filter((r) => r.state !== "updated").length;
-  const reachedClosing = closed.filter((r) => r.closingOutcome === "sent_to_closing").length;
+  const book = useMemo(() => splitLoanBook(rows), [rows]);
+  const total = useMemo(() => approvedTotal(rows), [rows]);
+  const needing = book.active.filter((r) => r.state !== "updated").length;
 
   return (
     <div className="space-y-5">
-      <Card>
-        <CardContent className="pt-6">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[14px]">
-              {active.length === 0 ? (
-                <span className="text-muted">Nothing being tracked yet.</span>
+      <div
+        role="tablist"
+        aria-label="Loans"
+        className="flex gap-1 rounded-xl border border-hairline bg-[#f6f8fb] p-1"
+      >
+        <Tab
+          selected={tab === "active"}
+          onSelect={() => setTab("active")}
+          label="Being worked"
+          count={book.active.length}
+        />
+        <Tab
+          selected={tab === "approved"}
+          onSelect={() => setTab("approved")}
+          label="SBA approved"
+          count={book.approved.length}
+        />
+      </div>
+
+      {tab === "active" ? (
+        <>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[14px]">
+                  {book.active.length === 0 ? (
+                    <span className="text-muted">Nothing being tracked yet.</span>
+                  ) : (
+                    <>
+                      <span className="font-semibold">
+                        {book.active.length - needing} of {book.active.length}
+                      </span>{" "}
+                      <span className="text-muted">up to date this week</span>
+                    </>
+                  )}
+                </p>
+                {!adding && (
+                  <Button size="sm" onClick={() => setAdding(true)}>
+                    <Plus className="h-4 w-4" /> Add a loan
+                  </Button>
+                )}
+              </div>
+
+              {adding && <AddLoan lenders={lenders} onDone={() => setAdding(false)} />}
+
+              {book.active.length === 0 && !adding ? (
+                <EmptyState
+                  title="No loans being tracked"
+                  description="Add one and it starts asking for a weekly update. Logging that update also counts as a touch with the lender who sent it over."
+                  className="py-8"
+                />
               ) : (
-                <>
-                  <span className="font-semibold">
-                    {active.length - needing} of {active.length}
-                  </span>{" "}
-                  <span className="text-muted">up to date this week</span>
-                </>
+                <ul className="divide-y divide-hairline">
+                  {book.active.map((loan) => (
+                    <LoanItem key={loan.id} loan={loan} />
+                  ))}
+                </ul>
               )}
-            </p>
-            {!adding && (
-              <Button size="sm" onClick={() => setAdding(true)}>
-                <Plus className="h-4 w-4" /> Add a loan
-              </Button>
-            )}
-          </div>
+            </CardContent>
+          </Card>
 
-          {adding && <AddLoan lenders={lenders} onDone={() => setAdding(false)} />}
-
-          {active.length === 0 && !adding ? (
-            <EmptyState
-              title="No loans being tracked"
-              description="Add one and it starts asking for a weekly update. Logging that update also counts as a touch with the lender who sent it over."
-              className="py-8"
-            />
-          ) : (
-            <ul className="divide-y divide-hairline">
-              {active.map((loan) => (
-                <LoanItem key={loan.id} loan={loan} />
-              ))}
-            </ul>
+          {book.dead.length > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="mb-1 text-[13px] font-semibold text-muted">
+                  Didn&apos;t happen ({book.dead.length})
+                </p>
+                <p className="mb-3 text-[12.5px] text-muted">
+                  A deal that died still counts as a referral on the lender who sent it — the
+                  weekly asking stops, the credit doesn&apos;t.
+                </p>
+                <ul className="divide-y divide-hairline">
+                  {book.dead.map((loan) => (
+                    <LoanItem key={loan.id} loan={loan} />
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
-
-      {closed.length > 0 && (
+        </>
+      ) : (
         <Card>
           <CardContent className="pt-6">
-            <p className="mb-3 text-[13px] font-semibold text-muted">
-              No longer tracking ({closed.length})
-              {reachedClosing > 0 && ` · ${reachedClosing} reached closing`}
-            </p>
-            <ul className="divide-y divide-hairline">
-              {closed.map((loan) => (
-                <LoanItem key={loan.id} loan={loan} />
-              ))}
-            </ul>
+            {book.approved.length === 0 ? (
+              <EmptyState
+                title="Nothing approved yet"
+                description="When a loan gets SBA approval, mark it on the other tab. It stops asking for weekly updates and lands here."
+                className="py-8"
+              />
+            ) : (
+              <>
+                <div className="mb-4">
+                  <p className="text-[14px]">
+                    <span className="font-semibold">{total.count}</span>{" "}
+                    <span className="text-muted">
+                      approved{total.amount > 0 && ", "}
+                    </span>
+                    {total.amount > 0 && (
+                      <span className="font-semibold">{formatCurrency(total.amount)}</span>
+                    )}
+                  </p>
+                  {total.missingAmount > 0 && (
+                    // Said out loud, because a total covering some of the book
+                    // reads as the whole book.
+                    <p className="mt-0.5 text-[12.5px] text-muted">
+                      {total.missingAmount} without an amount, so the total is short.
+                    </p>
+                  )}
+                </div>
+                <ul className="divide-y divide-hairline">
+                  {book.approved.map((loan) => (
+                    <ApprovedItem key={loan.id} loan={loan} />
+                  ))}
+                </ul>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
     </div>
+  );
+}
+
+function Tab({
+  selected,
+  onSelect,
+  label,
+  count,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  label: string;
+  count: number;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={onSelect}
+      className={cn(
+        "flex-1 rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors",
+        selected ? "bg-white text-foreground shadow-sm" : "text-muted hover:text-foreground",
+      )}
+    >
+      {label}{" "}
+      <span className={cn("tabular-nums", selected ? "text-muted" : "")}>({count})</span>
+    </button>
+  );
+}
+
+/**
+ * An approved loan: the date, the amount, and a way to add the amount later.
+ *
+ * No weekly-update machinery, because there is nothing left to chase. This is
+ * the win column.
+ */
+function ApprovedItem({ loan }: { loan: LoanRow }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function save() {
+    const parsed = parseAmount(amount);
+    if (parsed === null) {
+      setError("Give me a number greater than zero.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await setApprovedAmount(loan.id, parsed);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setEditing(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <li className="py-3.5 first:pt-0">
+      <div className="flex flex-wrap items-start gap-3">
+        <BadgeCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-teal" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[14.5px] font-semibold">{loan.borrower}</p>
+          <p className="mt-0.5 text-[12.5px] text-muted">
+            {loan.lenderId ? (
+              <Link
+                href={`/lenders/${loan.lenderId}`}
+                className="hover:text-foreground hover:underline"
+              >
+                {loan.lenderName}
+              </Link>
+            ) : (
+              "No lender linked"
+            )}
+            {loan.institution && ` · ${loan.institution}`}
+          </p>
+          <p className="mt-1 text-[12.5px] font-medium text-teal">
+            Approved{loan.approvedOn && ` ${formatDate(loan.approvedOn)}`}
+            {loan.approvedAmount != null && ` · ${formatCurrency(loan.approvedAmount)}`}
+          </p>
+
+          {loan.approvedAmount == null &&
+            (editing ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Input
+                  autoFocus
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="1,250,000"
+                  aria-label={`Approved amount for ${loan.borrower}`}
+                  className="w-40"
+                />
+                <Button size="sm" onClick={save} disabled={pending}>
+                  Save
+                </Button>
+                <Button size="sm" variant="quiet" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="mt-1 text-[12.5px] text-primary hover:underline"
+              >
+                Add the amount
+              </button>
+            ))}
+          {error && <p className="mt-1 text-[12.5px] text-danger">{error}</p>}
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -226,7 +413,7 @@ function AddLoan({ lenders, onDone }: { lenders: LoanLender[]; onDone: () => voi
 function LoanItem({ loan }: { loan: LoanRow }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [panel, setPanel] = useState<"draft" | "handoff" | null>(null);
+  const [panel, setPanel] = useState<"draft" | "handoff" | "approve" | null>(null);
   const [construction, setConstruction] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const style = STATE_STYLE[loan.state];
@@ -264,7 +451,9 @@ function LoanItem({ loan }: { loan: LoanRow }) {
             {loan.institution && ` · ${loan.institution}`}
           </p>
           <p className={cn("mt-1 text-[12.5px] font-medium", style.tone)}>
-            {loan.closingOutcome ? OUTCOME_LABEL[loan.closingOutcome] : style.label}
+            {isLoanOutcome(loan.closingOutcome)
+              ? LOAN_OUTCOME_LABEL[loan.closingOutcome]
+              : style.label}
             {loan.state === "overdue" && ` · ${loan.daysLate} days late`}
             {loan.lastUpdateAt
               ? ` · last update ${relativeDays(loan.lastUpdateAt)}`
@@ -285,20 +474,29 @@ function LoanItem({ loan }: { loan: LoanRow }) {
               <Button
                 size="sm"
                 variant="secondary"
+                onClick={() => setPanel((p) => (p === "approve" ? null : "approve"))}
+                disabled={pending}
+                title="Record the approval and stop the weekly updates"
+              >
+                <BadgeCheck className="h-3.5 w-3.5" /> SBA approved
+              </Button>
+              <Button
+                size="sm"
+                variant="quiet"
                 onClick={() => setPanel((p) => (p === "handoff" ? null : "handoff"))}
                 disabled={pending}
-                title="SBA approved — send the handoff email and stop the weekly updates"
+                title="Write the approval email to the lender, and mark it approved"
               >
-                <Check className="h-3.5 w-3.5" /> Sent to closing
+                <Check className="h-3.5 w-3.5" /> Approved + email
               </Button>
               <Button
                 size="sm"
                 variant="quiet"
                 onClick={() => run(() => closeLoan(loan.id, "did_not_happen"))}
                 disabled={pending}
-                title="Didn't happen — stops the weekly updates, sends nothing"
+                title="Stops the weekly updates and sends nothing. The referral still counts."
               >
-                <XCircle className="h-3.5 w-3.5" />
+                <XCircle className="h-3.5 w-3.5" /> Deal died
               </Button>
             </>
           ) : (
@@ -329,6 +527,10 @@ function LoanItem({ loan }: { loan: LoanRow }) {
         <UpdateDraft loanId={loan.id} mode="weekly" onDone={() => setPanel(null)} />
       )}
 
+      {panel === "approve" && (
+        <ApprovalForm loan={loan} onDone={() => setPanel(null)} />
+      )}
+
       {panel === "handoff" && (
         <>
           <label className="mt-3 flex items-center gap-2 text-[13px] font-medium">
@@ -351,5 +553,84 @@ function LoanItem({ loan }: { loan: LoanRow }) {
 
       {error && <p className="mt-2 text-[13px] text-danger">{error}</p>}
     </li>
+  );
+}
+
+/**
+ * The two facts worth capturing at the moment of approval.
+ *
+ * The date defaults to today and the amount can be left blank, because the
+ * approval itself is what has to be recorded now — an amount he has to go and
+ * look up would turn a one-tap action into a task for later, and later is when
+ * things stop getting recorded. The Approved tab asks for what's missing.
+ */
+function ApprovalForm({ loan, onDone }: { loan: LoanRow; onDone: () => void }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [approvedOn, setApprovedOn] = useState(todayLocal());
+  const [amount, setAmount] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit() {
+    const typed = amount.trim();
+    const parsed = typed === "" ? null : parseAmount(typed);
+    if (typed !== "" && parsed === null) {
+      setError("That amount doesn't look like a number. Leave it blank to add later.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await closeLoan(loan.id, "sba_approved", {
+        approvedOn: approvedOn || null,
+        amount: parsed,
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      onDone();
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-teal-border bg-teal-soft p-3.5">
+      <p className="text-[13px] font-semibold">SBA approved — {loan.borrower}</p>
+      <p className="mt-0.5 text-[12.5px] text-muted">
+        Stops the weekly updates and moves it to the approved tab. The referral still counts.
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <div>
+          <Label htmlFor={`approved-on-${loan.id}`}>Approved on</Label>
+          <Input
+            id={`approved-on-${loan.id}`}
+            type="date"
+            value={approvedOn}
+            onChange={(e) => setApprovedOn(e.target.value)}
+            className="w-44"
+          />
+        </div>
+        <div>
+          <Label htmlFor={`approved-amount-${loan.id}`}>Amount (optional)</Label>
+          <Input
+            id={`approved-amount-${loan.id}`}
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="1,250,000"
+            className="w-44"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={submit} disabled={pending}>
+            <BadgeCheck className="h-3.5 w-3.5" /> Mark approved
+          </Button>
+          <Button size="sm" variant="quiet" onClick={onDone} disabled={pending}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+      {error && <p className="mt-2 text-[12.5px] text-danger">{error}</p>}
+    </div>
   );
 }

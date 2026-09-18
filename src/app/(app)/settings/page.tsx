@@ -9,11 +9,17 @@ import { getFlags } from "@/lib/flags";
 import { SettingsForm } from "./settings-form";
 import { AvailabilityCard } from "./availability-card";
 import { InvitesCard } from "./invites-card";
+import { MicrosoftCard } from "./microsoft-card";
 import { listInvites } from "./invite-actions";
 
 export const metadata = { title: "Settings" };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ microsoft?: string }>;
+}) {
+  const { microsoft: microsoftResult } = await searchParams;
   const supabase = await createClient();
   const [{ data: profile }, { data: prefs }, { data: availability }, inviteResult] = await Promise.all([
     supabase.from("users").select("*").maybeSingle(),
@@ -63,6 +69,8 @@ export default async function SettingsPage() {
           }}
         />
 
+        <MicrosoftCard result={microsoftResult} />
+
         {/* Only the workspace admin gets this — listInvites errors for everyone else. */}
         {inviteResult.invites && <InvitesCard initialInvites={inviteResult.invites} />}
 
@@ -74,15 +82,6 @@ export default async function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <ConnectionRow
-              name="Microsoft 365"
-              enabled={flags.microsoft}
-              detail={
-                flags.microsoft
-                  ? "Connected — Outlook drafts and calendar holds available."
-                  : "Not connected. Outlook drafts, availability, and calendar holds turn on once Microsoft credentials are configured. Requires admin consent at your organization."
-              }
-            />
             <ConnectionRow
               name="AI drafting"
               enabled={flags.ai}

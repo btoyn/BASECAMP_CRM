@@ -109,3 +109,12 @@ export const TERRITORIES = [
   "Southern Utah",
   "Other",
 ] as const;
+
+/** Timeline filters on a lender, shared by the page and the slide-over. */
+export const TIMELINE_FILTERS = [
+  { key: "all", label: "All activity" },
+  { key: "personal", label: "Personal interactions" },
+  { key: "deals", label: "Deals & loans" },
+  { key: "notes", label: "Notes & promises" },
+  { key: "campaigns", label: "Campaigns" },
+] as const;

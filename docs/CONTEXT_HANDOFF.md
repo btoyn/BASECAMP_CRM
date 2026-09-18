@@ -1,4 +1,4 @@
-# Basecamp — Context Handoff
+# North — Context Handoff
 
 **For an assistant picking this project up cold.** Read `docs/PRODUCT_SPEC.md` for what the product
 *is* and why. This document is where the work actually stands, how it is built, what to be careful
@@ -41,7 +41,7 @@ These are not preferences to be polite about — they were stated directly and r
 | Tests | **Vitest**, 117 tests across 8 files, all pure logic |
 
 **Important:** the repo, the Vercel project and the URL are all still named `fable-tracker`. Only
-the *product* was renamed to Basecamp. Renaming the infrastructure would break links for no gain —
+the *product* was renamed to North. Renaming the infrastructure would break links for no gain —
 that was a deliberate call.
 
 ### There is a hard rule about Next.js in this repo
@@ -180,7 +180,7 @@ meeting briefs · expenses and drop-off logging · job-change alerts · campaign
 |---|---|
 | `532429f` | Grouped the lender list by territory then bank, with roll-up headers |
 | `e82369e` | Corrected six stale or wrong facts in the user guide |
-| `00e7601` | Rebrand to Basecamp — traced logo, palette, renamed everywhere |
+| `00e7601` | Rebrand to North — traced logo, palette, renamed everywhere |
 | `2b893d2` | The weekly loan-update email composer, no stage picker |
 | `6ccf7e1` | Looks — logging deal mentions and who brings them |
 | `654a728` | Kept the original August build plan in the repo |

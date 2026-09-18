@@ -57,6 +57,6 @@ class NoopProvider implements EmailProvider {
 
 export function getEmailProvider(): EmailProvider {
   const key = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Basecamp <notifications@example.com>";
+  const from = process.env.EMAIL_FROM ?? "North <notifications@example.com>";
   return key ? new ResendProvider(key, from) : new NoopProvider();
 }

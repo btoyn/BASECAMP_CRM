@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { MEETING_TYPE_DURATIONS } from "@/lib/labels";
 import { logAudit } from "@/lib/audit";
+import { loadSchedulingWindow, type CalendarSource } from "@/lib/scheduling-window";
+import { addConfirmedMeetingToCalendar } from "@/lib/microsoft/calendar-sync";
 import type { AvailabilityRule } from "@/lib/scheduling";
 
 /**
@@ -22,12 +24,17 @@ export interface ProposalContext {
     fullName: string;
     firstName: string;
     email: string | null;
+    /** Where the rest of the team is, for the "invite others" path. */
+    institutionId: string | null;
+    institutionName: string | null;
   };
   rules: AvailabilityRule[];
   horizonDays: number;
   slotCount: number;
   /** Meetings and dates already promised elsewhere, as ISO strings. */
   busy: { start: string; end: string }[];
+  /** Whether those blocks include his real Outlook calendar. */
+  calendar: CalendarSource;
   daysSinceContact: number | null;
 }
 
@@ -43,70 +50,25 @@ export async function getProposalContext(
   if (!user) return { error: "Not signed in." };
 
   const now = new Date();
-  const [{ data: lender }, { data: rules }, { data: prefs }, { data: meetings }, { data: pending }, { data: lastTouch }] =
-    await Promise.all([
-      supabase
-        .from("lenders")
-        .select("id, full_name, first_name, email")
-        .eq("id", lenderId)
-        .is("deleted_at", null)
-        .maybeSingle(),
-      supabase
-        .from("availability_rules")
-        .select("meeting_type, weekdays, start_minute, end_minute")
-        .eq("user_id", user.id),
-      supabase
-        .from("user_preferences")
-        .select("propose_horizon_days, proposal_slot_count")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("meetings")
-        .select("start_at, end_at")
-        .in("status", ["tentative", "confirmed"])
-        .not("start_at", "is", null)
-        .gte("start_at", now.toISOString())
-        .is("deleted_at", null),
-      // Dates already dangled in front of someone else. Offering the same
-      // Thursday to two lenders is the one way this creates a problem it was
-      // meant to prevent.
-      supabase
-        .from("meeting_proposals")
-        .select("offered_slots, meeting_type")
-        .eq("status", "sent")
-        .is("deleted_at", null),
-      supabase
-        .from("activities")
-        .select("occurred_at")
-        .eq("lender_id", lenderId)
-        .eq("personal_touch", true)
-        .order("occurred_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
+  const [{ data: lender }, window, { data: lastTouch }] = await Promise.all([
+    supabase
+      .from("lenders")
+      .select("id, full_name, first_name, email, institution_id, institution:institutions(name)")
+      .eq("id", lenderId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    loadSchedulingWindow(supabase, now),
+    supabase
+      .from("activities")
+      .select("occurred_at")
+      .eq("lender_id", lenderId)
+      .eq("personal_touch", true)
+      .order("occurred_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (!lender) return { error: "Lender not found." };
-
-  const busy: { start: string; end: string }[] = [];
-
-  for (const m of meetings ?? []) {
-    if (!m.start_at) continue;
-    const start = new Date(m.start_at);
-    const end = m.end_at ? new Date(m.end_at) : new Date(start.getTime() + 60 * MINUTE);
-    busy.push({ start: start.toISOString(), end: end.toISOString() });
-  }
-
-  for (const p of pending ?? []) {
-    const minutes = MEETING_TYPE_DURATIONS[p.meeting_type] ?? 60;
-    for (const iso of p.offered_slots ?? []) {
-      const start = new Date(iso);
-      if (start < now) continue;
-      busy.push({
-        start: start.toISOString(),
-        end: new Date(start.getTime() + minutes * MINUTE).toISOString(),
-      });
-    }
-  }
 
   const daysSinceContact = lastTouch?.occurred_at
     ? Math.floor((now.getTime() - new Date(lastTouch.occurred_at).getTime()) / 86_400_000)
@@ -119,16 +81,15 @@ export async function getProposalContext(
         fullName: lender.full_name,
         firstName: lender.first_name,
         email: lender.email,
+        institutionId: lender.institution_id,
+        institutionName:
+          (lender.institution as unknown as { name: string } | null)?.name ?? null,
       },
-      rules: (rules ?? []).map((r) => ({
-        meetingType: r.meeting_type,
-        weekdays: r.weekdays ?? [],
-        startMinute: r.start_minute,
-        endMinute: r.end_minute,
-      })),
-      horizonDays: prefs?.propose_horizon_days ?? 14,
-      slotCount: prefs?.proposal_slot_count ?? 2,
-      busy,
+      rules: window.rules,
+      horizonDays: window.horizonDays,
+      slotCount: window.slotCount,
+      busy: window.busy,
+      calendar: window.calendar,
       daysSinceContact,
     },
   };
@@ -286,7 +247,7 @@ export async function bookProposal(
 
   const { data: lender } = await supabase
     .from("lenders")
-    .select("full_name, institution_id, territory")
+    .select("full_name, institution_id, territory, email")
     .eq("id", proposal.lender_id)
     .maybeSingle();
   if (!lender) return { error: "Lender not found." };
@@ -325,6 +286,17 @@ export async function bookProposal(
     response_status: "confirmed",
   });
   if (attendeeError) return { error: attendeeError.message };
+
+  // Best effort: the meeting is booked in North either way. A calendar that
+  // won't answer must not undo a confirmation he already pressed.
+  await addConfirmedMeetingToCalendar({
+    meetingId: meeting.id,
+    subject: `${label} with ${lender.full_name}`,
+    start,
+    minutes,
+    locationName: proposal.location_name,
+    attendeeEmails: lender.email ? [lender.email] : [],
+  });
 
   await supabase
     .from("meeting_proposals")

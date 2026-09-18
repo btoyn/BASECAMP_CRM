@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarPlus, Check, Copy, Mail, Settings2, X } from "lucide-react";
+import { CalendarPlus, Check, Copy, Mail, Settings2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { GroupProposalSheet } from "@/components/propose-group-meeting";
 import { describeSlot, draftProposalEmail, findOpenSlots } from "@/lib/scheduling";
 import { MEETING_TYPE_DURATIONS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
@@ -36,11 +37,14 @@ export function ProposeMeeting({
   lenderId: string;
   children: (open: () => void) => React.ReactNode;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  // The group sheet is the same ask with more people on it, so it opens from
+  // here rather than sending him somewhere else to start again.
+  const [mode, setMode] = useState<"closed" | "single" | "group">("closed");
+  const [groupInstitutionId, setGroupInstitutionId] = useState<string | null>(null);
   const triggerWrap = useRef<HTMLSpanElement>(null);
 
   function close() {
-    setIsOpen(false);
+    setMode("closed");
     // Put focus back where it came from without reading activeElement.
     triggerWrap.current?.querySelector<HTMLElement>("button, a")?.focus();
   }
@@ -49,9 +53,25 @@ export function ProposeMeeting({
     <>
       {/* display:contents keeps the caller's layout untouched */}
       <span ref={triggerWrap} className="contents">
-        {children(() => setIsOpen(true))}
+        {children(() => setMode("single"))}
       </span>
-      {isOpen && <Sheet lenderId={lenderId} onClose={close} />}
+      {mode === "single" && (
+        <Sheet
+          lenderId={lenderId}
+          onClose={close}
+          onInviteOthers={(institutionId) => {
+            setGroupInstitutionId(institutionId);
+            setMode("group");
+          }}
+        />
+      )}
+      {mode === "group" && groupInstitutionId && (
+        <GroupProposalSheet
+          institutionId={groupInstitutionId}
+          preselectLenderIds={[lenderId]}
+          onClose={close}
+        />
+      )}
     </>
   );
 }
@@ -61,7 +81,15 @@ function toLocalInputValue(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function Sheet({ lenderId, onClose }: { lenderId: string; onClose: () => void }) {
+function Sheet({
+  lenderId,
+  onClose,
+  onInviteOthers,
+}: {
+  lenderId: string;
+  onClose: () => void;
+  onInviteOthers: (institutionId: string) => void;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [context, setContext] = useState<ProposalContext | null>(null);
@@ -218,6 +246,22 @@ function Sheet({ lenderId, onClose }: { lenderId: string; onClose: () => void })
           <>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="flex flex-col gap-4 px-5 py-4">
+                {context.lender.institutionId && (
+                  <button
+                    type="button"
+                    onClick={() => onInviteOthers(context.lender.institutionId!)}
+                    className="flex min-h-11 items-center gap-2 rounded-xl border border-border px-3.5 py-2.5 text-left text-[13.5px] font-medium transition-colors hover:border-primary/40 hover:bg-primary-soft/50"
+                  >
+                    <UserPlus className="h-4 w-4 shrink-0 text-primary" />
+                    <span>
+                      Invite others from {context.lender.institutionName ?? "the same bank"}
+                      <span className="block text-[12.5px] font-normal text-muted">
+                        One email to the group, {context.lender.firstName} included
+                      </span>
+                    </span>
+                  </button>
+                )}
+
                 <fieldset>
                   <legend className="mb-1.5 text-[13px] font-medium">What kind?</legend>
                   <div className="flex flex-wrap gap-2">
@@ -308,8 +352,11 @@ function Sheet({ lenderId, onClose }: { lenderId: string; onClose: () => void })
                       ))}
                     </div>
                     <p className="mt-1.5 text-[12px] text-muted">
-                      Worked out from your availability and what&apos;s already booked. It
-                      can&apos;t see your Outlook calendar yet — check these before you send.
+                      {context.calendar === "outlook"
+                        ? "Worked out from your availability, what's already booked, and your Outlook calendar."
+                        : context.calendar === "outlook_unavailable"
+                          ? "Outlook didn't answer just now, so these avoid only what the app already knows about — check them before you send."
+                          : "Worked out from your availability and what's already booked. It can't see your Outlook calendar yet — check these before you send."}
                     </p>
                   </div>
                 )}

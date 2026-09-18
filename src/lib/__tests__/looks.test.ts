@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { LOOK_STAGE, daysBetween, followUpDate, isLookOpen, lookState, lookTitle } from "../looks";
+import {
+  LOOK_STAGE,
+  PIPELINE_COLUMNS,
+  daysBetween,
+  followUpDate,
+  isLookOpen,
+  isLookStatus,
+  isPipelineColumn,
+  lookState,
+  lookStatusFromStage,
+  lookTitle,
+  readLookStatus,
+  stageForStatus,
+} from "../looks";
 
 describe("isLookOpen", () => {
   it("closes only on the three closing stages", () => {
@@ -116,5 +129,46 @@ describe("lookTitle", () => {
   it("says so plainly when there is nothing to go on", () => {
     expect(lookTitle({})).toBe("Unnamed look");
     expect(lookTitle({ borrowerName: "  ", notes: "  " })).toBe("Unnamed look");
+  });
+});
+
+describe("pipeline columns", () => {
+  it("has three columns, left to right the way a look travels", () => {
+    expect(PIPELINE_COLUMNS.map((c) => c.status)).toEqual([
+      "new",
+      "followed_up",
+      "became_loan",
+    ]);
+  });
+
+  it("keeps looks that went nowhere off the board", () => {
+    expect(isPipelineColumn("went_nowhere")).toBe(false);
+    expect(isLookStatus("went_nowhere")).toBe(true);
+  });
+
+  it("reads anything unrecognised as a new look rather than losing it", () => {
+    expect(readLookStatus(null)).toBe("new");
+    expect(readLookStatus("sideways")).toBe("new");
+    expect(readLookStatus("became_loan")).toBe("became_loan");
+  });
+
+  it("places a look from the old stage vocabulary alone", () => {
+    expect(lookStatusFromStage("initial_inquiry", 0)).toBe("new");
+    expect(lookStatusFromStage("initial_inquiry", 2)).toBe("followed_up");
+    // A stage from the longer deal list is still open, and still chased.
+    expect(lookStatusFromStage("documents_pending", 1)).toBe("followed_up");
+    expect(lookStatusFromStage("handed_off", 3)).toBe("became_loan");
+    expect(lookStatusFromStage("dormant", 1)).toBe("went_nowhere");
+    expect(lookStatusFromStage("closed_no_handoff", 0)).toBe("went_nowhere");
+  });
+
+  it("carries the follow-up clock with the card", () => {
+    // Moving to a closed column has to close the stage too, or a look that
+    // became a loan keeps asking to be chased.
+    expect(stageForStatus("became_loan")).toBe(LOOK_STAGE.becameLoan);
+    expect(stageForStatus("went_nowhere")).toBe(LOOK_STAGE.wentNowhere);
+    expect(stageForStatus("new")).toBe(LOOK_STAGE.open);
+    expect(stageForStatus("followed_up")).toBe(LOOK_STAGE.open);
+    expect(isLookOpen(stageForStatus("followed_up"))).toBe(true);
   });
 });

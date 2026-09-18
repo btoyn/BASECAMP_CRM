@@ -4,31 +4,33 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Users,
-  Landmark,
+  Orbit,
+  KanbanSquare,
   CheckSquare,
   Banknote,
-  AlertCircle,
   BookOpen,
   Settings,
   Trash2,
   Phone,
-  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { QuickLog } from "@/components/quick-log";
-import { BasecampLockup } from "@/components/brand";
+import { NorthLockup } from "@/components/brand";
 import type { NavCounts, QuickLogData } from "@/lib/data";
 
-/** Import lives in Settings, not primary navigation. */
+/**
+ * Five destinations, not seven.
+ *
+ * Lenders, Institutions and Needs Attention were three doors into the same
+ * table — Spheres is that table with its useful slices named. Looks became
+ * Pipeline. Import still lives in Settings.
+ */
 const PRIMARY_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, count: null },
-  { href: "/lenders", label: "Lenders", icon: Users, count: null },
-  { href: "/institutions", label: "Institutions", icon: Landmark, count: null },
+  { href: "/spheres", label: "Spheres", icon: Orbit, count: "needsAttention" },
+  { href: "/pipeline", label: "Pipeline", icon: KanbanSquare, count: "looksDue" },
+  { href: "/loans", label: "Loans", icon: Banknote, count: "loansDue" },
   { href: "/follow-ups", label: "Follow-ups", icon: CheckSquare, count: "followUps" },
-  { href: "/loans", label: "Loan updates", icon: Banknote, count: "loansDue" },
-  { href: "/looks", label: "Looks", icon: Lightbulb, count: "looksDue" },
-  { href: "/needs-attention", label: "Needs Attention", icon: AlertCircle, count: "needsAttention" },
 ] as const;
 
 const UTILITY_NAV = [
@@ -38,10 +40,10 @@ const UTILITY_NAV = [
 ];
 
 /* The centre slot is the quick-log trigger, not a link — logging happens daily
-   while adding a lender is occasional and already prominent on Lenders. */
+   while adding a lender is occasional and already prominent on Spheres. */
 const MOBILE_LEFT = [
   { href: "/dashboard", label: "Today", icon: LayoutDashboard },
-  { href: "/lenders", label: "Lenders", icon: Users },
+  { href: "/spheres", label: "Spheres", icon: Orbit },
 ];
 
 const MOBILE_RIGHT = [
@@ -155,7 +157,7 @@ export function AppShell({
       {/* Light sidebar, primary navigation grouped away from utilities */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-4 md:flex">
         <Link href="/dashboard" className="mb-5 flex items-center px-1.5">
-          <BasecampLockup size={16} />
+          <NorthLockup size={16} />
         </Link>
 
         <QuickLog data={quickLog}>

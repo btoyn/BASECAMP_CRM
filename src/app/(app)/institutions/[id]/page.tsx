@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge, SampleBadge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ProposeGroupMeeting } from "@/components/propose-group-meeting";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITY_TYPE_LABELS, ROLE_TYPE_LABELS } from "@/lib/labels";
 import { formatDate } from "@/lib/utils";
@@ -54,6 +55,12 @@ export default async function InstitutionProfilePage({
           <SampleBadge />
         </div>
       )}
+
+      {/* He rarely takes one lender to lunch — more often a bank's team, or
+          three of its seven. This is where that starts. */}
+      <div className="mb-5">
+        <ProposeGroupMeeting institutionId={institution.id} />
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
-import { LOOK_STAGE, followUpDate } from "@/lib/looks";
+import { LOOK_STAGE, followUpDate, isLookStatus, stageForStatus, type LookStatus } from "@/lib/looks";
 
 /**
  * Looks from lenders.
@@ -64,6 +64,7 @@ export async function logLook(input: {
       notes,
       communication_path: "lender_led",
       stage: LOOK_STAGE.open,
+      look_status: "new",
       received_at: followUpDate(now, 0),
       last_activity_at: now.toISOString(),
       next_follow_up_at: followUpDate(now, days),
@@ -99,21 +100,25 @@ export async function logLook(input: {
     newValue: { lenderId: lender.id, borrowerName: input.borrowerName?.trim() || null },
   });
 
-  revalidatePath("/looks");
+  revalidatePath("/pipeline");
   revalidatePath("/dashboard");
   revalidatePath(`/lenders/${lender.id}`);
   return {};
 }
 
 /**
- * Records that you circled back, and sets the next follow-up date.
+ * Moves a look to another column.
  *
- * The note matters more here than anywhere else in the app: six weeks later,
- * "what did I tell Kelly about that Cedar City building" needs an answer, and
- * this is the only place it will exist.
+ * One verb for the whole board, because the board offers one gesture. It also
+ * carries the things a column change implies: the follow-up clock stops when a
+ * look closes and restarts when it reopens, and arriving in "Followed up" logs
+ * the touch on the lender's timeline — circling back on a deal is contact, and
+ * not counting it would show someone as neglected the week you spoke to them.
  */
-export async function logFollowUp(
+export async function moveLook(
   lookId: string,
+  status: LookStatus,
+  /** What you told them, or why it died. Optional either way. */
   note?: string,
 ): Promise<{ error?: string }> {
   const supabase = await createClient();
@@ -121,30 +126,46 @@ export async function logFollowUp(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
+  if (!isLookStatus(status)) return { error: "That isn't a column." };
 
   const { data: look } = await supabase
     .from("opportunities")
-    .select("id, lender_id, institution_id, borrower_name, follow_up_attempt_count")
+    .select(
+      "id, lender_id, institution_id, borrower_name, follow_up_attempt_count, look_status",
+    )
     .eq("id", lookId)
     .is("deleted_at", null)
     .maybeSingle();
   if (!look) return { error: "That look is no longer here." };
+  if (look.look_status === status && !note?.trim()) return {};
 
   const now = new Date();
-  const days = await followUpInterval(supabase, user.id);
+  const stage = stageForStatus(status);
+  const closing = status === "became_loan" || status === "went_nowhere";
+  const days = closing ? 0 : await followUpInterval(supabase, user.id);
+  // Only a fresh arrival in the column counts as another attempt; nudging the
+  // same card twice is not two follow-ups.
+  const arriving = look.look_status !== status;
 
   const { error } = await supabase
     .from("opportunities")
     .update({
+      look_status: status,
+      stage,
+      next_follow_up_at: closing ? null : followUpDate(now, days),
       last_activity_at: now.toISOString(),
-      next_follow_up_at: followUpDate(now, days),
-      follow_up_attempt_count: (look.follow_up_attempt_count ?? 0) + 1,
+      follow_up_attempt_count:
+        status === "followed_up" && arriving
+          ? (look.follow_up_attempt_count ?? 0) + 1
+          : look.follow_up_attempt_count,
+      dormant_reason: status === "went_nowhere" ? note?.trim() || null : null,
+      preflight_handoff_date: status === "became_loan" ? followUpDate(now, 0) : null,
       updated_at: now.toISOString(),
     })
     .eq("id", lookId);
   if (error) return { error: error.message };
 
-  if (look.lender_id) {
+  if (status === "followed_up" && arriving && look.lender_id) {
     await supabase.from("activities").insert({
       user_id: user.id,
       lender_id: look.lender_id,
@@ -153,7 +174,9 @@ export async function logFollowUp(
       activity_type: "deal_conversation",
       direction: "outbound",
       occurred_at: now.toISOString(),
-      subject: look.borrower_name ? `Followed up — ${look.borrower_name}` : "Followed up on a look",
+      subject: look.borrower_name
+        ? `Followed up — ${look.borrower_name}`
+        : "Followed up on a look",
       summary: note?.trim() || null,
       personal_touch: true,
       counts_for_coverage: true,
@@ -161,82 +184,10 @@ export async function logFollowUp(
     });
   }
 
-  revalidatePath("/looks");
+  revalidatePath("/pipeline");
   revalidatePath("/dashboard");
+  revalidatePath("/spheres", "layout");
   if (look.lender_id) revalidatePath(`/lenders/${look.lender_id}`);
-  return {};
-}
-
-/** Closes a look, either way. The record stays so the history stays readable. */
-async function closeLook(
-  lookId: string,
-  stage: string,
-  reason?: string,
-): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const now = new Date();
-
-  const { data: look } = await supabase
-    .from("opportunities")
-    .select("id, lender_id")
-    .eq("id", lookId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (!look) return { error: "That look is no longer here." };
-
-  const { error } = await supabase
-    .from("opportunities")
-    .update({
-      stage,
-      next_follow_up_at: null,
-      last_activity_at: now.toISOString(),
-      dormant_reason: stage === LOOK_STAGE.wentNowhere ? reason?.trim() || null : null,
-      preflight_handoff_date:
-        stage === LOOK_STAGE.becameLoan ? followUpDate(now, 0) : null,
-      updated_at: now.toISOString(),
-    })
-    .eq("id", lookId);
-  if (error) return { error: error.message };
-
-  revalidatePath("/looks");
-  revalidatePath("/dashboard");
-  if (look.lender_id) revalidatePath(`/lenders/${look.lender_id}`);
-  return {};
-}
-
-export async function markBecameLoan(lookId: string) {
-  return closeLook(lookId, LOOK_STAGE.becameLoan);
-}
-
-export async function markWentNowhere(lookId: string, reason?: string) {
-  return closeLook(lookId, LOOK_STAGE.wentNowhere, reason);
-}
-
-/** Puts a closed look back on the clock. */
-export async function reopenLook(lookId: string): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not signed in." };
-
-  const now = new Date();
-  const days = await followUpInterval(supabase, user.id);
-
-  const { error } = await supabase
-    .from("opportunities")
-    .update({
-      stage: LOOK_STAGE.open,
-      next_follow_up_at: followUpDate(now, days),
-      dormant_reason: null,
-      preflight_handoff_date: null,
-      updated_at: now.toISOString(),
-    })
-    .eq("id", lookId);
-  if (error) return { error: error.message };
-
-  revalidatePath("/looks");
-  revalidatePath("/dashboard");
   return {};
 }
 
@@ -261,7 +212,7 @@ export async function deleteLook(lookId: string): Promise<{ error?: string }> {
     undoAvailable: true,
   });
 
-  revalidatePath("/looks");
+  revalidatePath("/pipeline");
   revalidatePath("/dashboard");
   return {};
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
+import { isLoanOutcome, type LoanOutcome } from "@/lib/loans";
 
 /**
  * Active loans, kept deliberately thin (spec §26, "keep this lightweight").
@@ -72,13 +73,20 @@ export async function createLoan(input: {
  * Stops the weekly clock, recording which of the two endings it was.
  *
  * Two buttons rather than one generic "done" because the difference matters:
- * how many of these reached closing is the only outcome number this screen can
- * honestly report, and a deal that died is not the same as a deal that funded.
+ * how many of these reached SBA approval is the only outcome number this
+ * screen can honestly report, and a deal that died is not the same as a win.
+ *
+ * `approval` carries the date and amount when the ending is an approval. The
+ * date arrives as a wall-clock `YYYY-MM-DD` from the browser, because which
+ * day an approval landed on is a calendar fact, not an instant.
  */
 export async function closeLoan(
   loanId: string,
-  outcome: "sent_to_closing" | "did_not_happen",
+  outcome: LoanOutcome,
+  approval?: { approvedOn?: string | null; amount?: number | null },
 ): Promise<{ error?: string }> {
+  if (!isLoanOutcome(outcome)) return { error: "Unknown outcome." };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("active_loans")
@@ -86,12 +94,40 @@ export async function closeLoan(
       updates_active: false,
       next_update_due_at: null,
       closing_outcome: outcome,
+      ...(outcome === "sba_approved"
+        ? {
+            stage: "sba_approved",
+            sba_approval_date: approval?.approvedOn ?? null,
+            approved_sba_amount: approval?.amount ?? null,
+          }
+        : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", loanId);
   if (error) return { error: error.message };
   revalidatePath("/loans");
   revalidatePath("/dashboard");
+  return {};
+}
+
+/**
+ * Fills in an approval amount that was skipped at the time.
+ *
+ * Approving in one tap matters more than approving completely, so the amount
+ * can arrive later from the Approved tab.
+ */
+export async function setApprovedAmount(
+  loanId: string,
+  amount: number | null,
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("active_loans")
+    .update({ approved_sba_amount: amount, updated_at: new Date().toISOString() })
+    .eq("id", loanId)
+    .eq("closing_outcome", "sba_approved");
+  if (error) return { error: error.message };
+  revalidatePath("/loans");
   return {};
 }
 
@@ -103,6 +139,10 @@ export async function reopenLoan(loanId: string): Promise<{ error?: string }> {
       updates_active: true,
       next_update_due_at: new Date().toISOString().slice(0, 10),
       closing_outcome: null,
+      // The approval goes with the outcome. A reopened loan that kept its
+      // approval date would count as a win and still be asking for updates.
+      sba_approval_date: null,
+      approved_sba_amount: null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", loanId);
@@ -250,8 +290,10 @@ export async function recordUpdateSent(input: {
   loanId: string;
   body: string;
   toBorrower: boolean;
-  /** True for the handoff email, which is the last one — no next week. */
+  /** True for the approval email, which is the last one — no next week. */
   closing?: boolean;
+  /** Wall-clock `YYYY-MM-DD` the approval landed on, from the browser. */
+  approvedOn?: string | null;
 }): Promise<{ error?: string }> {
   const supabase = await createClient();
   const {
@@ -278,7 +320,13 @@ export async function recordUpdateSent(input: {
       updated_at: now.toISOString(),
       // The handoff email ends the cadence in the same click that sends it.
       ...(input.closing
-        ? { updates_active: false, next_update_due_at: null, closing_outcome: "sent_to_closing" }
+        ? {
+            updates_active: false,
+            next_update_due_at: null,
+            closing_outcome: "sba_approved",
+            stage: "sba_approved",
+            sba_approval_date: input.approvedOn ?? null,
+          }
         : { next_update_due_at: nextDue }),
     })
     .eq("id", input.loanId);
@@ -295,7 +343,7 @@ export async function recordUpdateSent(input: {
       direction: "outbound",
       occurred_at: now.toISOString(),
       subject: input.closing
-        ? `Handed off to closing — ${loan.borrower_name}`
+        ? `SBA approved — ${loan.borrower_name}`
         : `Weekly update — ${loan.borrower_name}`,
       summary: `Emailed ${who}.`,
       details: input.body,

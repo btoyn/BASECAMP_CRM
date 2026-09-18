@@ -185,7 +185,7 @@ export function buildCoverageSplit(lenders: LenderWithCoverage[]): CoverageSplit
       key: "personal",
       label: "Personal",
       count: tally.personal,
-      href: "/lenders?view=on_track",
+      href: "/spheres/on-track",
       color: "#1e5bff",
       hint: "One-to-one contact inside the goal window",
     },
@@ -193,7 +193,7 @@ export function buildCoverageSplit(lenders: LenderWithCoverage[]): CoverageSplit
       key: "campaign",
       label: "Campaign only",
       count: tally.campaign,
-      href: "/needs-attention?f=campaign_only",
+      href: "/spheres/campaign-only",
       color: "#9a6f14",
       hint: "Reached by campaign email, never personally",
     },
@@ -201,7 +201,7 @@ export function buildCoverageSplit(lenders: LenderWithCoverage[]): CoverageSplit
       key: "uncovered",
       label: "Uncovered",
       count: tally.uncovered,
-      href: "/needs-attention",
+      href: "/spheres/needs-contact",
       color: "#c9cfdd",
       hint: "No contact of any kind inside the window",
     },
@@ -472,12 +472,93 @@ export interface ProposalRow {
   overdue: boolean;
 }
 
+export interface GroupProposalRow {
+  id: string;
+  institutionId: string | null;
+  institutionName: string;
+  meetingType: string;
+  customLabel: string | null;
+  /** ISO instants, in the order they went out. */
+  offeredSlots: string[];
+  sentAt: string | null;
+  waitingDays: number;
+  /** Raw enough for the tally to run in the browser, where the clock is his. */
+  attendees: {
+    lenderId: string;
+    name: string;
+    firstName: string;
+    repliedAt: string | null;
+    replyText: string | null;
+    verdicts: string[];
+    counteredSlot: string | null;
+  }[];
+}
+
 export interface ProposalQueue {
   /** Replied and needs him to say yes — accepted dates and counter-offers. */
   needsDecision: ProposalRow[];
   /** Sent, still silent. */
   waiting: ProposalRow[];
+  /** Group asks in flight. Each attendee answers separately, so these don't
+   *  split into decide-or-wait the way a single proposal does. */
+  groups: GroupProposalRow[];
   chaseDays: number;
+}
+
+/**
+ * Group proposals still in flight.
+ *
+ * No counting happens here. Which date is winning is wall-clock work and the
+ * screens do it, so this hands over the replies as they were recorded.
+ */
+export async function getGroupProposals(): Promise<GroupProposalRow[]> {
+  const supabase = await createClient();
+  const now = Date.now();
+
+  const { data } = await supabase
+    .from("meeting_proposals")
+    .select(
+      "id, institution_id, meeting_type, custom_label, offered_slots, sent_at, institution:institutions(name), attendees:meeting_proposal_attendees(lender_id, replied_at, reply_text, slot_verdicts, countered_slot, lender:lenders(full_name, first_name))",
+    )
+    .is("lender_id", null)
+    .eq("status", "sent")
+    .is("deleted_at", null)
+    .order("sent_at", { nullsFirst: false });
+
+  return (data ?? []).map((r) => {
+    const sentMs = r.sent_at ? new Date(r.sent_at).getTime() : null;
+    const attendees = (r.attendees ?? []) as unknown as {
+      lender_id: string;
+      replied_at: string | null;
+      reply_text: string | null;
+      slot_verdicts: string[] | null;
+      countered_slot: string | null;
+      lender: { full_name: string; first_name: string } | null;
+    }[];
+
+    return {
+      id: r.id,
+      institutionId: r.institution_id,
+      institutionName:
+        (r.institution as unknown as { name: string } | null)?.name ?? "a bank",
+      meetingType: r.meeting_type,
+      customLabel: r.custom_label,
+      offeredSlots: r.offered_slots ?? [],
+      sentAt: r.sent_at,
+      waitingDays: sentMs ? Math.floor((now - sentMs) / 86_400_000) : 0,
+      attendees: attendees
+        .map((a) => ({
+          lenderId: a.lender_id,
+          name: a.lender?.full_name ?? "Unknown",
+          firstName: a.lender?.first_name ?? "they",
+          repliedAt: a.replied_at,
+          replyText: a.reply_text,
+          verdicts: a.slot_verdicts ?? [],
+          counteredSlot: a.countered_slot,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  });
 }
 
 /**
@@ -490,16 +571,18 @@ export async function getProposalQueue(): Promise<ProposalQueue> {
   const supabase = await createClient();
   const now = new Date();
 
-  const [{ data: prefs }, { data: rows }] = await Promise.all([
+  const [{ data: prefs }, { data: rows }, groups] = await Promise.all([
     supabase.from("user_preferences").select("proposal_chase_days").maybeSingle(),
     supabase
       .from("meeting_proposals")
       .select(
         "id, lender_id, meeting_type, custom_label, offered_slots, status, sent_at, reply_text, countered_slot, countered_conflicts, last_nudged_at, lender:lenders(full_name, first_name)",
       )
+      .not("lender_id", "is", null)
       .in("status", ["sent", "accepted", "countered"])
       .is("deleted_at", null)
       .order("sent_at", { nullsFirst: false }),
+    getGroupProposals(),
   ]);
 
   const chaseDays = prefs?.proposal_chase_days ?? 4;
@@ -539,7 +622,7 @@ export async function getProposalQueue(): Promise<ProposalQueue> {
   // Longest wait first — those are the ones going cold.
   waiting.sort((a, b) => b.waitingDays - a.waitingDays);
 
-  return { needsDecision, waiting, chaseDays };
+  return { needsDecision, waiting, groups, chaseDays };
 }
 
 export { daysSince };

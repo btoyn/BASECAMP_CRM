@@ -121,10 +121,10 @@ export function RelationshipRows({
               />
             </div>
             <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] font-semibold">
-              <Link href="/needs-attention" className="text-primary hover:underline">
+              <Link href="/spheres/needs-contact" className="text-primary hover:underline">
                 View all Top {total || 10}
               </Link>
-              <Link href="/lenders?view=needs_contact" className="text-muted hover:text-foreground">
+              <Link href="/spheres/needs-contact" className="text-muted hover:text-foreground">
                 Open On Deck
               </Link>
             </div>

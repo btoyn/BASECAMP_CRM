@@ -31,6 +31,11 @@ export function daysSince(date: Date, now: Date = new Date()): number {
  * A confirmed future meeting counts as covered immediately; if it is
  * canceled the caller recomputes from the last completed touch, which this
  * function does naturally.
+ *
+ * Every boundary is relative to the goal, because the goal is no longer one
+ * number: tiers give an A lender a fortnight and a C lender a quarter (see
+ * `lib/tiers`). "Seriously overdue" is twice the goal, which at the default
+ * 30-day window is the same 60 days it always was.
  */
 export function coverageStatus(
   lastTouchAt: Date | string | null,
@@ -49,7 +54,7 @@ export function coverageStatus(
 
   if (days <= goalDays) return "on_track";
   if (days <= goalDays + graceDays) return "grace";
-  if (days <= 60) return "overdue";
+  if (days <= goalDays * 2) return "overdue";
   return "seriously_overdue";
 }
 

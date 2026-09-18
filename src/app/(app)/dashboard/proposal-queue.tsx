@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarCheck, Clock, MessageSquareReply, X } from "lucide-react";
+import { CalendarCheck, Clock, MessageSquareReply, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { readReply } from "@/lib/reply-reader";
 import { describeSlot } from "@/lib/scheduling";
+import { describeGroupProgress, tallyGroupReplies, type SlotVerdict } from "@/lib/group-proposal";
 import { MEETING_TYPE_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import {
@@ -16,7 +17,7 @@ import {
   nudgeProposal,
   recordProposalReply,
 } from "@/app/(app)/scheduling/actions";
-import type { ProposalQueue as QueueData, ProposalRow } from "@/lib/dashboard";
+import type { GroupProposalRow, ProposalQueue as QueueData, ProposalRow } from "@/lib/dashboard";
 
 /**
  * Meetings he's asked for and hasn't nailed down yet (spec §15, steps 11–13).
@@ -27,7 +28,9 @@ import type { ProposalQueue as QueueData, ProposalRow } from "@/lib/dashboard";
  * against.
  */
 export function ProposalQueue({ data }: { data: QueueData }) {
-  if (data.needsDecision.length === 0 && data.waiting.length === 0) return null;
+  if (data.needsDecision.length === 0 && data.waiting.length === 0 && data.groups.length === 0) {
+    return null;
+  }
 
   return (
     <section className="rounded-[18px] border border-border bg-surface p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
@@ -43,6 +46,9 @@ export function ProposalQueue({ data }: { data: QueueData }) {
       <ul className="flex flex-col divide-y divide-hairline">
         {data.needsDecision.map((p) => (
           <DecisionRow key={p.id} proposal={p} />
+        ))}
+        {data.groups.map((p) => (
+          <GroupRow key={p.id} proposal={p} chaseDays={data.chaseDays} />
         ))}
         {data.waiting.map((p) => (
           <WaitingRow key={p.id} proposal={p} chaseDays={data.chaseDays} />
@@ -283,6 +289,61 @@ function WaitingRow({ proposal, chaseDays }: { proposal: ProposalRow; chaseDays:
           </div>
         </div>
       )}
+    </li>
+  );
+}
+
+/**
+ * A group ask, summed up in one line: how many have written back, and how many
+ * of them are free on the date that's winning.
+ *
+ * Counting happens in `lib/group-proposal` so this row and the proposal screen
+ * can never disagree about which date is best.
+ */
+function GroupRow({ proposal, chaseDays }: { proposal: GroupProposalRow; chaseDays: number }) {
+  const tally = tallyGroupReplies({
+    offeredSlots: proposal.offeredSlots.map((s) => new Date(s)),
+    attendees: proposal.attendees.map((a) => ({
+      lenderId: a.lenderId,
+      name: a.name,
+      firstName: a.firstName,
+      repliedAt: a.repliedAt,
+      replyText: a.replyText,
+      verdicts: a.verdicts as SlotVerdict[],
+      counteredSlot: a.counteredSlot,
+    })),
+  });
+
+  const silent = tally.replied.length === 0 && proposal.waitingDays >= chaseDays;
+  const label =
+    proposal.customLabel?.trim() || MEETING_TYPE_LABELS[proposal.meetingType] || "Meeting";
+
+  return (
+    <li className="py-3 first:pt-0">
+      <Link href={`/proposals/${proposal.id}`} className="flex items-center gap-3 group">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+          <Users className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-semibold group-hover:underline">
+            {label} with {proposal.institutionName}
+          </span>
+          <span className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-muted">
+            <Clock className="h-3 w-3 shrink-0" />
+            {describeGroupProgress(tally)}
+            {silent && (
+              <span className="rounded-full bg-danger-soft px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-[#a8434a]">
+                No replies
+              </span>
+            )}
+          </span>
+        </span>
+        {tally.hasAnyYes && (
+          <span className="shrink-0 rounded-full bg-teal-soft px-2 py-0.5 text-[11.5px] font-semibold text-[#1f6b60]">
+            Ready to confirm
+          </span>
+        )}
+      </Link>
     </li>
   );
 }

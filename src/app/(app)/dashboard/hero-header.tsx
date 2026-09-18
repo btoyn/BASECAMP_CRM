@@ -4,23 +4,30 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, HandCoins, Send, Sparkles, Users, X } from "lucide-react";
+import { ArrowRight, HandCoins, Send, Sparkles, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { askAssistant, startWeeklyOutreach } from "./actions";
 
 export interface HeroChip {
-  icon: "promise" | "loan" | "list";
+  icon: "promise" | "list";
   label: string;
 }
 
 const CHIP_ICONS = {
   promise: HandCoins,
-  loan: CalendarClock,
   list: Users,
 } as const;
 
 /**
- * Hero header. The mountain photograph lives at
+ * Hero header: greeting, what today needs, and the two things you might start.
+ *
+ * It used to carry a coverage ring as well. That is the same figure Relationship
+ * Momentum leads with a few hundred pixels below, and two copies of one number
+ * is one too many — whichever you read first, you check the other to see if it
+ * agrees. Coverage, loan communication and meetings all live in Momentum now;
+ * this says hello and points at the work.
+ *
+ * The mountain photograph lives at
  * /public/images/mountain-sunrise-header.png and is cover-cropped so the peak
  * and sun sit on the right; the navy → royal-blue → transparent wash keeps the
  * left side readable. The gradient is a complete look on its own, so the hero
@@ -31,9 +38,6 @@ export function HeroHeader({
   firstName,
   summary,
   chips,
-  coveragePct,
-  coveredCount,
-  activeCount,
   hasPlan,
   aiEnabled,
 }: {
@@ -41,9 +45,6 @@ export function HeroHeader({
   firstName: string | null;
   summary: string;
   chips: HeroChip[];
-  coveragePct: number;
-  coveredCount: number;
-  activeCount: number;
   hasPlan: boolean;
   aiEnabled: boolean;
 }) {
@@ -115,8 +116,8 @@ export function HeroHeader({
           }}
         />
 
-        <div className="relative flex min-h-[230px] flex-col gap-5 p-5 sm:gap-6 sm:p-7 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
-          {/* Zone 1 + 2 — greeting, summary, actions, status chips */}
+        <div className="relative flex min-h-[230px] flex-col gap-5 p-5 sm:gap-6 sm:p-7">
+          {/* Greeting, summary, actions, status chips */}
           <div className="min-w-0 flex-1">
             <h1 className="text-[30px] font-bold leading-[1.08] tracking-[-0.025em] text-white sm:text-[38px] lg:text-[40px]">
               {greeting}
@@ -168,24 +169,6 @@ export function HeroHeader({
                 {error}
               </p>
             )}
-          </div>
-
-          {/* Zone 3 — frosted coverage panel */}
-          <div className="shrink-0 self-start lg:self-center">
-            <div className="flex items-center gap-3.5 rounded-2xl border border-white/25 bg-white/[0.13] p-3.5 backdrop-blur-md sm:gap-5 sm:p-5">
-              <CoverageRing value={coveragePct} />
-              <div className="text-white">
-                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-white/75 sm:text-[13px]">
-                  Personal coverage
-                </p>
-                <p className="mt-1 text-[15px] font-medium">
-                  {coveredCount} of {activeCount} lenders
-                </p>
-                <p className="mt-0.5 text-[12.5px] text-white/70">
-                  {activeCount - coveredCount} still to reach
-                </p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -246,48 +229,5 @@ export function HeroHeader({
         )}
       </div>
     </section>
-  );
-}
-
-/** Ring sized for the frosted panel; white on the photograph. */
-function CoverageRing({ value }: { value: number }) {
-  const pct = Math.max(0, Math.min(100, Math.round(value)));
-  const size = 96;
-  const stroke = 9;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const dash = (pct / 100) * circumference;
-
-  return (
-    <div className="relative inline-flex shrink-0 items-center justify-center">
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className="-rotate-90"
-        role="img"
-        aria-label={`Personal coverage: ${pct}%`}
-      >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={stroke}
-          className="stroke-white/25"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${circumference - dash}`}
-          className="stroke-white"
-        />
-      </svg>
-      <span className="absolute text-[22px] font-bold text-white tabular-nums">{pct}%</span>
-    </div>
   );
 }
