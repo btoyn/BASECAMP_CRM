@@ -93,13 +93,25 @@ You can revoke the whole thing at any time from
 
 ### Do you need IT?
 
-Probably not. A Microsoft 365 tenant by default lets any user register an
-application, and lets any user consent to these permissions for their own
-mailbox. If `im504.com` is on those defaults, you can do all of this yourself.
+Quite possibly, and it is worth checking before you start rather than finding
+out at step 5.
 
-You will find out at the last step. If Entra says an administrator must
-approve, forward them §5 of this file; the approval is one click and applies
-to your account only.
+Registering the app is the easy half: tenants let any user do that by default.
+Consent is the half that bites. The usual modern default is "allow user
+consent for apps from verified publishers, for selected permissions", and
+"selected permissions" means Microsoft's low-impact set — `User.Read`,
+`offline_access`, `openid`, `profile`, `email`. **`Calendars.ReadWrite`,
+`Mail.ReadWrite` and `Mail.Send` are not in that set.** They are precisely the
+class carved out of self-consent, and Basecamp will not be a verified
+publisher.
+
+Check which policy `im504.com` is on: **Identity → Enterprise applications →
+Consent and permissions → User consent settings**. "Allow user consent for all
+applications" means you can finish alone. Either of the other two means an
+administrator has to approve it.
+
+If they do, forward them this section. The approval is one click, applies to
+this account only, and everything in steps 1–4 still stands.
 
 ### Step 1 — Register the app
 
