@@ -130,7 +130,7 @@ Go to <https://entra.microsoft.com> and sign in with your work account.
      paste:
 
      ```
-     https://fable-tracker.vercel.app/api/microsoft/callback
+     https://north.vercel.app/api/microsoft/callback
      ```
 
      This must match character for character, including `https://` and with no
@@ -174,7 +174,7 @@ secret rather than anything you did wrong.
 
 ### Step 4 — Put the four values into Vercel
 
-<https://vercel.com/imbl/fable-tracker> → **Settings** → **Environment
+<https://vercel.com/imbl/north> → **Settings** → **Environment
 Variables**. Add each for **Production** (and Preview, if you want the preview
 deployments to work too — they need their own redirect URI added in step 1).
 

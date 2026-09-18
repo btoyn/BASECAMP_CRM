@@ -35,14 +35,15 @@ These are not preferences to be polite about — they were stated directly and r
 | Styling | **Tailwind CSS v4** with `@theme inline` custom properties in `src/app/globals.css` |
 | Database | **Supabase** Postgres, project `oflcbdnidtbqbwzpmvgp` ("lender-crm") |
 | Auth | Supabase Auth, email + password, publishable (`sb_publishable_…`) keys |
-| Hosting | **Vercel**, project `prj_iPzMFuTaCL9hTWNrZRQnQ67Q40Sw`, team `imbl` |
-| Live at | `fable-tracker.vercel.app` (also `fable-tracker-imbl.vercel.app`) |
-| Repo | `btoyn/FABLE-TRACKER`, working branch `claude/markdown-file-review-35iuoy` |
+| Hosting | **Vercel**, project `north` (`prj_epKWAZtO4PAIA3DSrxmxH1xyUmsV`), team `imbl` |
+| Live at | `north.vercel.app` |
+| Repo | `btoyn/BASECAMP_CRM`, default branch `main` |
 | Tests | **Vitest**, 117 tests across 8 files, all pure logic |
 
-**Important:** the repo, the Vercel project and the URL are all still named `fable-tracker`. Only
-the *product* was renamed to North. Renaming the infrastructure would break links for no gain —
-that was a deliberate call.
+**Naming, as it actually stands.** The product and the Vercel project are both `north`. The GitHub
+repo is still `BASECAMP_CRM`, one rename behind. The old Vercel project `fable-tracker` still
+exists and still serves `fable-tracker.vercel.app`; it was kept rather than deleted because it was
+the only working deployment while `north` was being set up.
 
 ### There is a hard rule about Next.js in this repo
 
