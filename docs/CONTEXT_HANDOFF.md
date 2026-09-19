@@ -37,13 +37,14 @@ These are not preferences to be polite about — they were stated directly and r
 | Auth | Supabase Auth, email + password, publishable (`sb_publishable_…`) keys |
 | Hosting | **Vercel**, project `north` (`prj_epKWAZtO4PAIA3DSrxmxH1xyUmsV`), team `imbl` |
 | Live at | `north.vercel.app` |
-| Repo | `btoyn/BASECAMP_CRM`, default branch `main` |
+| Repo | `btoyn/north`, default branch `main` |
 | Tests | **Vitest**, 117 tests across 8 files, all pure logic |
 
-**Naming, as it actually stands.** The product and the Vercel project are both `north`. The GitHub
-repo is still `BASECAMP_CRM`, one rename behind. The old Vercel project `fable-tracker` still
-exists and still serves `fable-tracker.vercel.app`; it was kept rather than deleted because it was
-the only working deployment while `north` was being set up.
+**Naming, as it actually stands.** Product, GitHub repo and Vercel project are all `north`. The
+repo kept its numeric id through the rename, so old clone URLs redirect and Vercel's link to it
+survived. The old Vercel project `fable-tracker` still exists and still serves
+`fable-tracker.vercel.app`; it was kept rather than deleted because it was the only working
+deployment while `north` was being set up, and it is safe to remove once nothing points at it.
 
 ### There is a hard rule about Next.js in this repo
 
