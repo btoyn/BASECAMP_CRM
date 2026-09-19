@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { anonKeyProblem } from "@/lib/supabase/config";
 import { getFlags } from "@/lib/flags";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,6 +28,17 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Checked before the request rather than after: the browser's own message
+    // for a bad character in a header names neither the value nor the
+    // character, and reads like a fault in the app.
+    const configProblem = anonKeyProblem();
+    if (configProblem) {
+      setError(configProblem);
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
